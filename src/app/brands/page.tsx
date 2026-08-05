@@ -1,0 +1,119 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Building2, Plus, FileText, ChevronRight, Sparkles, ShieldCheck, Globe, Database } from 'lucide-react';
+
+export default function BrandsPage() {
+  const [brands, setBrands] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/brands')
+      .then((res) => res.json())
+      .then((data) => {
+        setBrands(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Brand Intelligence & Guidelines</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Corporate brand DNA profiles, tone rules, prohibited terms, and ingested vector whitepapers.
+          </p>
+        </div>
+        <Link
+          href="/brands/new"
+          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-2 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Ingest & Create Brand Profile</span>
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-slate-500 text-xs">Loading brand profiles...</div>
+      ) : brands.length === 0 ? (
+        <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4 shadow-xl">
+          <Building2 className="w-12 h-12 text-indigo-500 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">No Brand Profiles Found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Extract your company website URL or upload whitepaper documents to create a brand DNA profile.
+          </p>
+          <Link
+            href="/brands/new"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold shadow-md shadow-indigo-600/30"
+          >
+            <Plus className="w-4 h-4" /> Ingest & Create Brand Profile
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {brands.map((brand) => (
+            <div
+              key={brand.id}
+              className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/40 transition-all space-y-4 flex flex-col justify-between shadow-xl"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
+                      {brand.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 dark:text-white">{brand.name}</h2>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">{brand.industry}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                    {brand.region}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">{brand.description}</p>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase block font-semibold">Personality & Tone</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-medium truncate block">{brand.tone}</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase block font-semibold">Vector RAG Docs</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold block">{brand._count?.knowledgeDocs || brand.knowledgeDocs?.length || 0} Files</span>
+                  </div>
+                </div>
+
+                {brand.prohibitedPhrases && (
+                  <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
+                    <strong>Prohibited Terms:</strong> {brand.prohibitedPhrases}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                <Link
+                  href={`/brands/${brand.id}/knowledge`}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-medium flex items-center gap-1.5 transition-all"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Manage Knowledge Base</span>
+                </Link>
+                <Link
+                  href={`/brands/${brand.id}/knowledge`}
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium flex items-center gap-1"
+                >
+                  View DNA Details <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

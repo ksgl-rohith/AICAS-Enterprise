@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   @default("MARKETING_MANAGER")
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brands     Brand[]
+  approvals  Approval[]
+  auditEvents AuditEvent[]
+}
+
+model Brand {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  industry            String
+  description         String
+  products            String // Comma or newline separated
+  targetAudience      String
+  personality         String
+  tone                String
+  preferredVocabulary String // Comma separated
+  prohibitedPhrases   String // Comma separated
+  requiredDisclaimers String // Comma separated
+  defaultCTA          String
+  region              String   @default("Global")
+  language            String   @default("en-US")
+  brandColors         String   @default("#6366f1,#4f46e5")
+  competitors         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  ingestionSources    IngestionSource[]
+  knowledgeDocs       BrandKnowledgeDocument[]
+  knowledgeChunks     KnowledgeChunk[]
+  campaigns           Campaign[]
+  platformConnections PlatformConnection[]
+  auditEvents         AuditEvent[]
+}
+
+model IngestionSource {
+  id               String   @id @default(cuid())
+  brandId          String
+  brand            Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  sourceType       String   // 'website_url', 'document', 'rss'
+  sourceUrl        String?
+  title            String
+  extractedContent String
+  extractedMetadataJson String? // JSON metadata (tone, audience, topics extracted)
+  status           String   @default("COMPLETED") // 'PENDING', 'COMPLETED', 'FAILED'
+  createdAt        DateTime @default(now())
+}
+
+model BrandKnowledgeDocument {
+  id          String   @id @default(cuid())
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  filename    String
+  fileType    String   // 'pdf', 'txt', 'md'
+  fileSize    Int
+  extractedText String
+  charCount   Int
+  chunkCount  Int
+  status      String   @default("PROCESSED") // 'PENDING', 'PROCESSED', 'FAILED'
+  uploadedAt  DateTime @default(now())
+
+  chunks KnowledgeChunk[]
+}
+
+model KnowledgeChunk {
+  id          String                 @id @default(cuid())
+  documentId  String
+  document    BrandKnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  brandId     String
+  brand       Brand                  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  chunkIndex  Int
+  content     String
+  charCount   Int
+  embeddingJson String?              // JSON array of embedding floats
+  createdAt   DateTime               @default(now())
+}
+
+model Campaign {
+  id               String   @id @default(cuid())
+  brandId          String
+  brand            Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name             String
+  objective        String   // 'awareness', 'engagement', 'webinar_registrations', 'qualified_leads', 'event_attendance', 'product_trial'
+  productOrTopic   String
+  description      String
+  targetAudience   String
+  offerCTA         String
+  startDate        DateTime
+  endDate          DateTime
+  channels         String   // Comma separated e.g. "linkedin,facebook,instagram,telegram"
+  region           String   @default("en-US")
+  language         String   @default("en-US")
+  textPostCount    Int      @default(3)
+  imageBriefCount  Int      @default(2)
+  carouselCount    Int      @default(1)
+  postingFrequency String   @default("daily")
+  requiredMessages String?
+  prohibitedThemes String?
+  groundingRequired Boolean @default(true)
+  approvalRequired Boolean  @default(true)
+  oversightMode    String   @default("APPROVAL_REQUIRED") // 'COPILOT', 'APPROVAL_REQUIRED', 'RISK_BASED', 'AUTONOMOUS'
+  status           String   @default("PLANNING") // 'PLANNING', 'STRATEGY_GENERATED', 'CONTENT_GENERATED', 'IN_REVIEW', 'APPROVED', 'ACTIVE', 'COMPLETED'
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  strategy     CampaignStrategy?
+  contentItems ContentItem[]
+  schedules    Schedule[]
+  auditEvents  AuditEvent[]
+}
+
+model CampaignStrategy {
+  id                     String   @id @default(cuid())
+  campaignId             String   @unique
+  campaign               Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  objectiveInterpretation String
+  audienceSummary        String
+  campaignNarrative      String
+  contentPillarsJson     String   // JSON array of pillar objects [{name, angle, rationale}]
+  channelRolesJson       String   // JSON object mapping channel to role
+  publishingCadence      String
+  contentIdeasJson       String   // JSON array of content idea titles
+  constraintsJson        String   // JSON array of constraints
+  retrievedEvidenceJson  String?  // JSON array of source refs
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model ContentItem {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title          String
+  coreIdea       String
+  targetAudience String
+  contentPillar  String
+  format         String   // 'text_post', 'image_post', 'carousel', 'video_script'
+  defaultCTA     String
+  status         String   @default("DRAFT") // 'DRAFT', 'NEEDS_REVISION', 'APPROVED', 'SCHEDULED', 'PUBLISHED', 'REJECTED'
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  variants     ContentVariant[]
+  reviewResult ReviewResult?
+  approvals    Approval[]
+  schedules    Schedule[]
+  publications Publication[]
+}
+
+model ContentVariant {
+  id            String      @id @default(cuid())
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  channel       String      // 'linkedin', 'facebook', 'instagram', 'telegram'
+  headline      String?
+  hook          String
+  bodyText      String
+  ctaText       String
+  hashtags      String?     // Comma separated
+  altText       String?
+  visualConcept String?     // For image/video briefs
+  carouselSlidesJson String? // JSON array of slide objects [{slideNumber, title, content, visualDirection}]
+  imageBriefJson String?    // JSON object for high-res image brief & prompt specs
+  infographicSpecsJson String? // JSON object for infographic data points & flow
+  staticVisualJson String?  // JSON object for static quote/stat visual card
+  evidenceRefsJson String?  // JSON array of evidence citations
+  status        String      @default("GENERATED")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model ReviewResult {
+  id                   String      @id @default(cuid())
+  contentItemId        String      @unique
+  contentItem          ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  brandScore           Int         // 0 - 100
+  factualRiskScore     Int         // 0 - 100
+  complianceScore      Int         // 0 - 100
+  originalityScore     Int         // 0 - 100
+  readabilityScore     Int         // 0 - 100
+  overallStatus        String      // 'passed', 'needs_revision', 'blocked'
+  confidence           Float       @default(0.95)
+  warningsJson         String      // JSON array of warning strings
+  correctionsJson      String?     // JSON array of correction objects
+  evidenceRefsJson     String?     // JSON array of evidence refs
+  prohibitedTermsFound String?     // Comma separated
+  missingDisclaimers   String?     // Comma separated
+  duplicateSimilarity  Float       @default(0.0)
+  reviewedAt           DateTime    @default(now())
+}
+
+model Approval {
+  id            String      @id @default(cuid())
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  reviewerId    String?
+  reviewer      User?       @relation(fields: [reviewerId], references: [id])
+  decision      String      // 'APPROVED', 'REVISION_REQUESTED', 'REJECTED'
+  comment       String?
+  editedContent String?     // If modified during approval
+  decidedAt     DateTime    @default(now())
+}
+
+model Schedule {
+  id            String      @id @default(cuid())
+  campaignId    String
+  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  channel       String      // 'linkedin', 'facebook', 'instagram', 'telegram'
+  scheduledTime DateTime
+  timezone      String      @default("UTC")
+  status        String      @default("SCHEDULED") // 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED', 'CANCELLED'
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  publications Publication[]
+}
+
+model Publication {
+  id             String   @id @default(cuid())
+  contentItemId  String
+  contentItem    ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  scheduleId     String?
+  schedule       Schedule?   @relation(fields: [scheduleId], references: [id])
+  channel        String   // 'linkedin', 'facebook', 'instagram', 'telegram'
+  publishingMode String   // 'simulated', 'live'
+  externalPostId String?
+  permalink      String?
+  status         String   // 'SUCCESS', 'FAILED', 'RETRYING'
+  idempotencyKey String   @unique
+  publishedAt    DateTime @default(now())
+
+  attempts        PublicationAttempt[]
+  metricsSnapshots MetricsSnapshot[]
+}
+
+model PublicationAttempt {
+  id            String      @id @default(cuid())
+  publicationId String
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  status        String      // 'SUCCESS', 'FAILED'
+  errorDetails  String?
+  requestPayloadJson String?
+  responsePayloadJson String?
+  attemptedAt   DateTime    @default(now())
+}
+
+model MetricsSnapshot {
+  id            String      @id @default(cuid())
+  publicationId String
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  channel       String
+  isReal        Boolean     @default(false) // true = live API, false = synthetic simulation
+  impressions   Int         @default(0)
+  reach         Int         @default(0)
+  engagements   Int         @default(0)
+  clicks        Int         @default(0)
+  saves         Int         @default(0)
+  shares        Int         @default(0)
+  conversions   Int         @default(0)
+  engagementRate Float      @default(0.0)
+  snapshotDate  DateTime    @default(now())
+}
+
+model TrendSignal {
+  id               String   @id @default(cuid())
+  topic            String
+  category         String
+  summary          String
+  source           String   @default("GDELT / Industry Intelligence")
+  relevanceScore   Float
+  freshnessScore   Float
+  opportunityScore Float
+  detectedAt       DateTime @default(now())
+}
+
+model Recommendation {
+  id                String   @id @default(cuid())
+  targetChannel     String
+  bestPillar        String
+  strongestHook     String
+  recommendedTopic  String
+  postingWindow     String
+  cta               String
+  explanation       String
+  confidence        Float
+  limitations       String
+  appliedToCampaignId String?
+  createdAt         DateTime @default(now())
+}
+
+model AgentRun {
+  id                  String   @id @default(cuid())
+  taskId              String
+  agentName           String   // 'BrandContextAgent', 'StrategyAgent', 'CopywritingAgent', 'ReviewAgent', 'PublishingAgent', 'AnalyticsAgent', 'OptimizationAgent'
+  status              String   // 'completed', 'needs_revision', 'blocked', 'failed'
+  inputSummary        String
+  outputSummary       String
+  confidence          Float
+  warningsJson        String?
+  latencyMs           Int
+  inputTokens         Int?
+  outputTokens        Int?
+  modelName           String   @default("gemini-2.5-flash")
+  promptVersion       String   @default("v1.0")
+  policyVersion       String   @default("v1.0")
+  executedAt          DateTime @default(now())
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  brandId     String?
+  brand       Brand?   @relation(fields: [brandId], references: [id])
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  action      String   // e.g., 'BRAND_CREATED', 'DOCUMENT_UPLOADED', 'STRATEGY_GENERATED', 'CONTENT_GENERATED', 'REVIEW_PASSED', 'APPROVED', 'PUBLISHED_SIMULATED', 'PUBLISHED_LIVE'
+  details     String
+  entityType  String
+  entityId    String
+  createdAt   DateTime @default(now())
+}
+
+model PlatformConnection {
+  id                    String    @id @default(cuid())
+  brandId               String
+  brand                 Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  platform              String    // 'linkedin', 'facebook', 'instagram', 'telegram'
+  accountName           String
+  accountId             String
+  organizationId        String?
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  tokenExpiry           DateTime?
+  scopes                String?
+  status                String    @default("CONNECTED") // 'CONNECTED', 'DISCONNECTED', 'EXPIRED', 'ERROR'
+  lastCheckedAt         DateTime  @default(now())
+  lastError             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([brandId, platform])
+}
