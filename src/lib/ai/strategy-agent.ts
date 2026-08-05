@@ -43,6 +43,7 @@ export class StrategyAgent {
     // Fetch brand context & grounded RAG chunks
     const brandCtx = await brandContextAgent.execute({
       taskId: `${task.taskId}_brand`,
+      tenantId: task.tenantId || 'tenant-default',
       brandId: task.brandId,
       input: { brandId: task.brandId, query: task.input.productOrTopic },
     });
@@ -60,6 +61,7 @@ export class StrategyAgent {
     // Fetch real-time market research signals
     const mrRes = await marketResearchAgent.execute({
       taskId: `${task.taskId}_mr`,
+      tenantId: task.tenantId || 'tenant-default',
       brandId: task.brandId,
       campaignId: task.campaignId,
       input: {

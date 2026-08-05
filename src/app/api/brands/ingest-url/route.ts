@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { modelGateway } from '@/lib/ai/model-gateway';
 import { z } from 'zod';
 
-export const BrandExtractionSchema = z.object({
+const BrandExtractionSchema = z.object({
   name: z.string(),
   industry: z.string(),
   description: z.string(),

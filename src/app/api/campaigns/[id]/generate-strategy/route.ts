@@ -18,6 +18,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const result = await strategyAgent.execute({
       taskId,
+      tenantId: 'tenant-default',
       brandId: campaign.brandId,
       campaignId: campaign.id,
       input: {

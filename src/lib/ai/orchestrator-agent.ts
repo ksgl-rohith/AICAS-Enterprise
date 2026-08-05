@@ -5,16 +5,20 @@ import { strategyAgent, StrategyOutput } from './strategy-agent';
 import { copywritingAgent, CopywritingOutput } from './copywriting-agent';
 import { reviewAgent, ReviewOutput } from './review-agent';
 import { marketResearchAgent, MarketResearchOutput } from './market-research-agent';
+import { trendIntelligenceAgent, TrendIntelligenceOutput } from './trend-intelligence-agent';
+import { contentPlanningAgent, ContentPlanningOutput } from './content-planning-agent';
 import { imageContentAgent } from './image-agent';
 import { carouselContentAgent } from './carousel-agent';
 import { infographicAgent } from './infographic-agent';
 import { staticVisualAgent } from './static-visual-agent';
+import { agentRegistry } from './agent-registry';
 
 export interface OrchestrationTaskInput {
   campaignId: string;
   brandId: string;
   oversightMode?: 'COPILOT' | 'APPROVAL_REQUIRED' | 'RISK_BASED' | 'AUTONOMOUS';
   autoSchedule?: boolean;
+  maxRevisions?: number;
 }
 
 export interface OrchestrationStepResult {
@@ -33,15 +37,20 @@ export interface OrchestrationOutput {
   stepsExecuted: OrchestrationStepResult[];
   strategy?: StrategyOutput;
   marketResearch?: MarketResearchOutput;
+  trendIntelligence?: TrendIntelligenceOutput;
+  contentPlan?: ContentPlanningOutput;
   contentItemsGenerated: number;
   autoScheduled: boolean;
+  revisionLoopsExecuted: number;
 }
 
 export class OrchestratorAgent {
   public async executePipeline(task: AgentTask<OrchestrationTaskInput>): Promise<AgentResult<OrchestrationOutput>> {
     const startTime = Date.now();
     const stepsExecuted: OrchestrationStepResult[] = [];
-    const { campaignId, brandId, autoSchedule = true } = task.input;
+    const { campaignId, brandId, autoSchedule = true, maxRevisions = 3 } = task.input;
+    const tenantId = task.tenantId || 'tenant-default';
+    const correlationId = task.correlationId || `corr_${Date.now()}`;
 
     // 1. Fetch Campaign & Brand
     const campaign = await db.campaign.findUnique({
@@ -52,6 +61,7 @@ export class OrchestratorAgent {
     if (!campaign) {
       return {
         taskId: task.taskId,
+        agentName: 'OrchestratorAgent',
         status: 'failed',
         confidence: 0,
         warnings: ['Campaign not found'],
@@ -61,12 +71,33 @@ export class OrchestratorAgent {
 
     const oversightMode = task.input.oversightMode || campaign.oversightMode || 'APPROVAL_REQUIRED';
 
-    // 2. Execute Market Research Agent
+    // Step A: Brand Context
+    const bcStartTime = Date.now();
+    const bcRes = await brandContextAgent.execute({
+      taskId: `${task.taskId}_bc`,
+      tenantId,
+      brandId,
+      campaignId,
+      correlationId,
+      input: { brandId, query: campaign.productOrTopic },
+    });
+
+    stepsExecuted.push({
+      stepName: 'Brand DNA & Context Setup',
+      agentName: 'BrandContextAgent',
+      status: bcRes.status,
+      latencyMs: Date.now() - bcStartTime,
+      summary: `Loaded Brand DNA for ${bcRes.output?.brandName || campaign.brand.name}.`,
+    });
+
+    // Step B: Market Research
     const mrStartTime = Date.now();
     const mrResult = await marketResearchAgent.execute({
       taskId: `${task.taskId}_mr`,
+      tenantId,
       brandId,
       campaignId,
+      correlationId,
       input: {
         industry: campaign.brand.industry,
         topicOrProduct: campaign.productOrTopic,
@@ -83,12 +114,49 @@ export class OrchestratorAgent {
       summary: mrResult.output?.researchSummary || 'Market research completed',
     });
 
-    // 3. Execute Strategy Agent
+    // Step C: Trend Intelligence
+    const trendStartTime = Date.now();
+    const trendResult = await trendIntelligenceAgent.execute({
+      taskId: `${task.taskId}_trend`,
+      tenantId,
+      brandId,
+      campaignId,
+      correlationId,
+      input: {
+        signals: [
+          {
+            id: `sig_1`,
+            title: `Latest Trends in ${campaign.productOrTopic}`,
+            summary: `Market intelligence signal for ${campaign.brand.industry}`,
+            source: 'Industry Signal Engine',
+            sourceType: 'news',
+            publishedAt: new Date().toISOString(),
+            keywords: [campaign.productOrTopic, campaign.brand.industry],
+          },
+        ],
+        industry: campaign.brand.industry,
+        brandKeywords: campaign.brand.preferredVocabulary.split(','),
+        targetAudience: campaign.targetAudience,
+        minOpportunityScore: 0.3,
+      },
+    });
+
+    stepsExecuted.push({
+      stepName: 'Trend Intelligence & Clustering',
+      agentName: 'TrendIntelligenceAgent',
+      status: trendResult.status,
+      latencyMs: Date.now() - trendStartTime,
+      summary: `Identified ${trendResult.output?.opportunities.length || 0} ranked trend opportunities.`,
+    });
+
+    // Step D: Strategy Generation
     const stratStartTime = Date.now();
     const stratResult = await strategyAgent.execute({
       taskId: `${task.taskId}_strat`,
+      tenantId,
       brandId,
       campaignId,
+      correlationId,
       input: {
         campaignId,
         brandId,
@@ -139,240 +207,261 @@ export class OrchestratorAgent {
       });
     }
 
-    // 4. Generate Content Items & Multi-Format Visuals
+    // Step E: Content Planning Agent
+    const planStartTime = Date.now();
+    const planResult = await contentPlanningAgent.execute({
+      taskId: `${task.taskId}_plan`,
+      tenantId,
+      brandId,
+      campaignId,
+      correlationId,
+      input: {
+        campaignId,
+        campaignName: campaign.name,
+        objective: campaign.objective,
+        channels: campaign.channels.split(',') as any,
+        startDate: campaign.startDate.toISOString(),
+        endDate: campaign.endDate.toISOString(),
+        pillars: stratResult.output?.contentPillars.map((p) => p.name) || ['Product Innovation'],
+        trends: trendResult.output?.opportunities || [],
+        postCountTarget: 3,
+      },
+    });
+
+    stepsExecuted.push({
+      stepName: 'Content Plan & Schedule Balancing',
+      agentName: 'ContentPlanningAgent',
+      status: planResult.status,
+      latencyMs: Date.now() - planStartTime,
+      summary: `Created calendar-ready plan with ${planResult.output?.planItems.length || 0} scheduled items.`,
+    });
+
+    // Step F: Generation & Quality Council Review Loop
     const channels = campaign.channels.split(',') as ('linkedin' | 'facebook' | 'instagram' | 'telegram')[];
     const contentIdeas = stratResult.output?.contentIdeas || [campaign.productOrTopic];
+    const planItems = planResult.output?.planItems || [];
 
     let itemsCreatedCount = 0;
-    const itemFormats = ['text_post', 'image_post', 'carousel', 'video_script'];
+    let revisionLoopsExecuted = 0;
+    let pipelineStatus: 'success' | 'needs_human_approval' | 'blocked' = 'success';
 
-    for (let i = 0; i < Math.min(3, contentIdeas.length); i++) {
-      const ideaTitle = contentIdeas[i];
-      const format = itemFormats[i % itemFormats.length] as any;
-      const pillar = stratResult.output?.contentPillars[i % (stratResult.output.contentPillars.length || 1)]?.name || 'Thought Leadership';
+    for (let i = 0; i < Math.min(3, planItems.length || contentIdeas.length); i++) {
+      const planItem = planItems[i];
+      const ideaTitle = planItem?.title || contentIdeas[i];
+      const format = planItem?.contentType || (i === 0 ? 'text_post' : i === 1 ? 'image_post' : 'carousel');
 
       // Create ContentItem
-      const contentItem = await db.contentItem.create({
+      const itemRecord = await db.contentItem.create({
         data: {
           campaignId,
           title: ideaTitle,
-          coreIdea: `${ideaTitle} for ${campaign.targetAudience}`,
+          coreIdea: `Strategic execution focusing on ${campaign.productOrTopic} for ${campaign.targetAudience}`,
           targetAudience: campaign.targetAudience,
-          contentPillar: pillar,
+          contentPillar: planItem?.contentPillar || stratResult.output?.contentPillars[0]?.name || 'Core Product',
           format,
           defaultCTA: campaign.offerCTA,
           status: 'DRAFT',
         },
       });
 
-      // Execute Copywriting Agent
-      const copyRes = await copywritingAgent.execute({
-        taskId: `${task.taskId}_copy_${contentItem.id}`,
+      // 1. Copywriting Studio Generation
+      const copyResult = await copywritingAgent.execute({
+        taskId: `${task.taskId}_copy_${i}`,
+        tenantId,
         brandId,
         campaignId,
+        correlationId,
         input: {
           brandId,
           campaignId,
           topicTitle: ideaTitle,
-          contentPillar: pillar,
+          contentPillar: planItem?.contentPillar || 'Product Innovation',
           targetAudience: campaign.targetAudience,
-          format,
+          format: format as any,
           defaultCTA: campaign.offerCTA,
           channels,
         },
       });
 
-      // Execute Visual Agents for richer visual artifacts
-      const imageRes = await imageContentAgent.execute({
-        taskId: `${task.taskId}_img_${contentItem.id}`,
-        brandId,
-        input: {
-          topicTitle: ideaTitle,
-          brandName: campaign.brand.name,
-          industry: campaign.brand.industry,
-          targetAudience: campaign.targetAudience,
-          channel: channels[0] || 'linkedin',
-          brandTone: campaign.brand.tone,
-        },
-      });
+      // Save Copy Variant
+      if (copyResult.output?.variants[0]) {
+        const v = copyResult.output.variants[0];
+        const variantRecord = await db.contentVariant.create({
+          data: {
+            contentItemId: itemRecord.id,
+            channel: v.channel,
+            headline: v.headline || null,
+            hook: v.hook,
+            bodyText: v.bodyText,
+            ctaText: v.ctaText,
+            hashtags: v.hashtags.join(','),
+            altText: v.altText || null,
+            visualConcept: v.visualConcept || null,
+            status: 'GENERATED',
+          },
+        });
 
-      const carouselRes = await carouselContentAgent.execute({
-        taskId: `${task.taskId}_car_${contentItem.id}`,
-        brandId,
-        input: {
-          topicTitle: ideaTitle,
-          brandName: campaign.brand.name,
-          industry: campaign.brand.industry,
-          targetAudience: campaign.targetAudience,
-          channel: 'instagram',
-        },
-      });
-
-      const infographicRes = await infographicAgent.execute({
-        taskId: `${task.taskId}_info_${contentItem.id}`,
-        brandId,
-        input: {
-          topicTitle: ideaTitle,
-          brandName: campaign.brand.name,
-          industry: campaign.brand.industry,
-          targetAudience: campaign.targetAudience,
-        },
-      });
-
-      const staticVisualRes = await staticVisualAgent.execute({
-        taskId: `${task.taskId}_stat_${contentItem.id}`,
-        brandId,
-        input: {
-          topicTitle: ideaTitle,
-          brandName: campaign.brand.name,
-          industry: campaign.brand.industry,
-        },
-      });
-
-      // Create ContentVariants
-      if (copyRes.output?.variants) {
-        for (const v of copyRes.output.variants) {
-          await db.contentVariant.create({
-            data: {
-              contentItemId: contentItem.id,
-              channel: v.channel,
-              headline: v.headline || null,
-              hook: v.hook,
-              bodyText: v.bodyText,
-              ctaText: v.ctaText,
-              hashtags: v.hashtags?.join(',') || null,
-              altText: v.altText || null,
-              visualConcept: v.visualConcept || null,
-              carouselSlidesJson: JSON.stringify(v.carouselSlides || carouselRes.output?.slides),
-              imageBriefJson: JSON.stringify(imageRes.output),
-              infographicSpecsJson: JSON.stringify(infographicRes.output),
-              staticVisualJson: JSON.stringify(staticVisualRes.output),
-              status: 'GENERATED',
+        // Generate format-specific visual briefs
+        if (format === 'image_post') {
+          const imgRes = await imageContentAgent.execute({
+            taskId: `${task.taskId}_img_${i}`,
+            tenantId,
+            brandId,
+            input: {
+              topicTitle: ideaTitle,
+              brandName: campaign.brand.name,
+              industry: campaign.brand.industry,
+              targetAudience: campaign.targetAudience,
+              channel: 'instagram',
+              brandTone: campaign.brand.tone,
             },
           });
+          if (imgRes.output) {
+            await db.contentVariant.update({
+              where: { id: variantRecord.id },
+              data: { imageBriefJson: JSON.stringify(imgRes.output) },
+            });
+          }
+        } else if (format === 'carousel') {
+          const carRes = await carouselContentAgent.execute({
+            taskId: `${task.taskId}_car_${i}`,
+            tenantId,
+            brandId,
+            input: {
+              topicTitle: ideaTitle,
+              brandName: campaign.brand.name,
+              industry: campaign.brand.industry,
+              targetAudience: campaign.targetAudience,
+              channel: 'linkedin',
+              slideCount: 4,
+            },
+          });
+          if (carRes.output) {
+            await db.contentVariant.update({
+              where: { id: variantRecord.id },
+              data: { carouselSlidesJson: JSON.stringify(carRes.output.slides) },
+            });
+          }
         }
       }
 
-      // Execute Review Agent
-      const revResult = await reviewAgent.execute({
-        taskId: `${task.taskId}_rev_${contentItem.id}`,
-        brandId,
-        campaignId,
-        input: {
-          contentItemId: contentItem.id,
+      // 2. Quality Council Review & Controlled Revision Loop
+      let currentAttempt = 0;
+      let reviewResult: AgentResult<ReviewOutput> | null = null;
+
+      while (currentAttempt <= maxRevisions) {
+        currentAttempt++;
+        reviewResult = await reviewAgent.execute({
+          taskId: `${task.taskId}_rev_${i}_try_${currentAttempt}`,
+          tenantId,
           brandId,
-        },
-      });
+          campaignId,
+          correlationId,
+          input: {
+            contentItemId: itemRecord.id,
+            brandId,
+          },
+        });
 
-      // Enforce Oversight Mode Governance Rules
-      let itemFinalStatus = 'DRAFT';
-      if (oversightMode === 'AUTONOMOUS') {
-        itemFinalStatus = revResult.output?.overallStatus === 'passed' ? 'APPROVED' : 'NEEDS_REVISION';
-      } else if (oversightMode === 'RISK_BASED') {
-        const isSafe = (revResult.output?.complianceScore || 0) >= 90 && (revResult.output?.factualRiskScore || 100) <= 20;
-        itemFinalStatus = isSafe ? 'APPROVED' : 'NEEDS_REVISION';
-      } else {
-        // COPILOT or APPROVAL_REQUIRED: Holds in Approval queue
-        itemFinalStatus = 'DRAFT';
-      }
+        const revStatus = reviewResult.output?.overallStatus;
 
-      await db.contentItem.update({
-        where: { id: contentItem.id },
-        data: { status: itemFinalStatus },
-      });
-
-      // Auto-Schedule if enabled or autonomous
-      if (autoSchedule && (itemFinalStatus === 'APPROVED' || oversightMode === 'AUTONOMOUS' || oversightMode === 'APPROVAL_REQUIRED')) {
-        const schedules = mrResult.output?.optimalChannelSchedules || [];
-        for (let idx = 0; idx < channels.length; idx++) {
-          const ch = channels[idx];
-          const schedInfo = schedules.find((s) => s.channel.toLowerCase() === ch.toLowerCase());
-          const postDate = new Date();
-          postDate.setDate(postDate.getDate() + (i + 1) * 2 + idx);
-          postDate.setHours(14, 0, 0, 0);
-
-          await db.schedule.create({
-            data: {
+        if (revStatus === 'blocked') {
+          pipelineStatus = 'blocked';
+          await db.contentItem.update({
+            where: { id: itemRecord.id },
+            data: { status: 'REJECTED' },
+          });
+          break; // Stop immediately on deterministic block!
+        } else if (revStatus === 'needs_revision' && currentAttempt <= maxRevisions) {
+          revisionLoopsExecuted++;
+          // Trigger targeted revision without infinite loop
+          await copywritingAgent.execute({
+            taskId: `${task.taskId}_copy_revision_${i}_try_${currentAttempt}`,
+            tenantId,
+            brandId,
+            campaignId,
+            correlationId,
+            input: {
+              brandId,
               campaignId,
-              contentItemId: contentItem.id,
-              channel: ch,
-              scheduledTime: postDate,
-              status: itemFinalStatus === 'APPROVED' ? 'SCHEDULED' : 'PENDING_APPROVAL',
+              topicTitle: ideaTitle,
+              contentPillar: planItem?.contentPillar || 'Product Innovation',
+              targetAudience: campaign.targetAudience,
+              format: format as any,
+              defaultCTA: campaign.offerCTA,
+              channels,
             },
           });
+        } else {
+          // Passed or max retries reached
+          break;
         }
       }
 
-      itemsCreatedCount++;
+      const finalStatus = reviewResult?.output?.overallStatus || 'passed';
+      stepsExecuted.push({
+        stepName: `Quality Council Governance (${ideaTitle})`,
+        agentName: 'QualityCouncilCoordinator',
+        status: finalStatus === 'passed' ? 'completed' : finalStatus === 'blocked' ? 'blocked' : 'needs_revision',
+        latencyMs: Date.now() - startTime,
+        summary: `Quality Council status: ${finalStatus.toUpperCase()} (Brand DNA: ${reviewResult?.output?.brandScore}, Compliance: ${reviewResult?.output?.complianceScore}).`,
+      });
+
+      if (finalStatus === 'passed') {
+        await db.contentItem.update({
+          where: { id: itemRecord.id },
+          data: { status: 'APPROVED' },
+        });
+        itemsCreatedCount++;
+      } else {
+        await db.contentItem.update({
+          where: { id: itemRecord.id },
+          data: { status: 'NEEDS_REVISION' },
+        });
+      }
     }
 
-    stepsExecuted.push({
-      stepName: 'Multi-Format Generation & Quality Review',
-      agentName: 'CopywritingAgent + ReviewAgent',
-      status: 'completed',
-      latencyMs: Date.now() - startTime,
-      summary: `Generated ${itemsCreatedCount} content items across ${channels.length} channels with visual previews.`,
-    });
-
-    // Update Campaign Status
-    await db.campaign.update({
-      where: { id: campaignId },
-      data: {
-        status: oversightMode === 'AUTONOMOUS' ? 'ACTIVE' : 'IN_REVIEW',
-        oversightMode,
-      },
-    });
-
-    // Audit Event Log
+    // Record Audit Event
     await db.auditEvent.create({
       data: {
         brandId,
         campaignId,
-        action: 'PIPELINE_ORCHESTRATED',
-        details: `Orchestrated multi-agent campaign pipeline under ${oversightMode} oversight mode. Generated ${itemsCreatedCount} content items.`,
-        entityType: 'Campaign',
+        action: 'PHASE1_PIPELINE_EXECUTED',
+        details: `Phase 1 governance pipeline completed. Status: ${pipelineStatus}. Items generated: ${itemsCreatedCount}. Revision loops: ${revisionLoopsExecuted}.`,
+        entityType: 'CAMPAIGN',
         entityId: campaignId,
       },
     });
 
-    // Log Agent Run
-    await db.agentRun.create({
-      data: {
-        taskId: task.taskId,
-        agentName: 'OrchestratorAgent',
-        status: 'completed',
-        inputSummary: `Campaign: ${campaign.name}, Oversight: ${oversightMode}`,
-        outputSummary: `Orchestrated ${stepsExecuted.length} steps. Generated ${itemsCreatedCount} content items.`,
-        confidence: 0.98,
-        latencyMs: Date.now() - startTime,
-      },
-    });
-
-    const pipelineStatus = oversightMode === 'AUTONOMOUS' ? 'success' : 'needs_human_approval';
+    const output: OrchestrationOutput = {
+      campaignId,
+      brandId,
+      oversightMode,
+      pipelineStatus,
+      stepsExecuted,
+      strategy: stratResult.output,
+      marketResearch: mrResult.output,
+      trendIntelligence: trendResult.output,
+      contentPlan: planResult.output,
+      contentItemsGenerated: itemsCreatedCount,
+      autoScheduled: autoSchedule && pipelineStatus === 'success',
+      revisionLoopsExecuted,
+    };
 
     return {
       taskId: task.taskId,
-      status: 'completed',
-      output: {
-        campaignId,
-        brandId,
-        oversightMode,
-        pipelineStatus,
-        stepsExecuted,
-        strategy: stratResult.output,
-        marketResearch: mrResult.output,
-        contentItemsGenerated: itemsCreatedCount,
-        autoScheduled: autoSchedule,
-      },
-      confidence: 0.98,
+      agentName: 'OrchestratorAgent',
+      status: pipelineStatus === 'success' ? 'completed' : pipelineStatus === 'blocked' ? 'blocked' : 'needs_revision',
+      output,
+      confidence: 0.95,
       warnings: [],
-      evidence: stratResult.evidence,
+      evidence: [],
       usage: {
         latencyMs: Date.now() - startTime,
       },
       provenance: {
-        model: 'orchestrator-v1',
-        promptVersion: 'v1.0-orchestration',
+        model: 'orchestrator-governance-engine-v1',
+        promptVersion: 'v1.0',
         policyVersion: 'v1.0',
       },
     };
@@ -380,3 +469,16 @@ export class OrchestratorAgent {
 }
 
 export const orchestratorAgent = new OrchestratorAgent();
+
+// Register in AgentRegistry
+agentRegistry.register({
+  name: 'OrchestratorAgent',
+  version: '1.0.0',
+  description: 'Coordinates Phase 1 content intelligence and Quality Council governance pipeline',
+  executionMode: 'hybrid',
+  inputSchema: undefined as any,
+  outputSchema: undefined as any,
+  allowedTools: ['pipeline_orchestrator'],
+  enabled: true,
+  handler: (task) => orchestratorAgent.executePipeline(task),
+});

@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     const taskId = `task_opt_${Date.now()}`;
     const result = await optimizationAgent.execute({
       taskId,
+      tenantId: 'tenant-default',
       brandId: targetBrandId,
       input: { brandId: targetBrandId },
     });

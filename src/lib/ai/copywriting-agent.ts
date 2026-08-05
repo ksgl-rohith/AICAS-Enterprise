@@ -51,6 +51,7 @@ export class CopywritingAgent {
     // Fetch brand context & RAG evidence
     const brandCtx = await brandContextAgent.execute({
       taskId: `${task.taskId}_brand`,
+      tenantId: task.tenantId || 'tenant-default',
       brandId: task.brandId,
       input: { brandId: task.brandId, query: task.input.topicTitle },
     });

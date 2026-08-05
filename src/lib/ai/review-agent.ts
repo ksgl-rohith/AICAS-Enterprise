@@ -1,10 +1,39 @@
 import { db } from '@/lib/db';
 import { AgentResult, AgentTask, EvidenceReference } from './agent-contract';
 import { brandContextAgent } from './brand-context-agent';
+import { factVerificationAgent, FactVerificationOutput } from './fact-verification-agent';
+import { complianceAgent, ComplianceOutput } from './compliance-agent';
+import { brandCriticAgent, BrandCriticOutput } from './brand-critic-agent';
+import { accessibilityAgent, AccessibilityOutput } from './accessibility-agent';
+import { seoDiscoveryAgent, SeoDiscoveryOutput } from './seo-discovery-agent';
+import { EvidenceRecord } from './evidence-model';
+import { agentRegistry } from './agent-registry';
+
+export interface QualityCouncilThresholds {
+  minBrandScore: number;            // default 75
+  minFactualConfidence: number;     // default 0.8
+  maxFactualRisk: number;           // default 30
+  maxDuplicateSimilarity: number;  // default 0.35
+  mandatoryAccessibility: boolean;  // default true
+  mandatoryHumanReviewCategories?: string[];
+}
 
 export interface ReviewInput {
   contentItemId: string;
   brandId: string;
+  thresholds?: Partial<QualityCouncilThresholds>;
+}
+
+export interface QualityCouncilDetails {
+  factVerification?: FactVerificationOutput;
+  compliance?: ComplianceOutput;
+  brandCritic?: BrandCriticOutput;
+  accessibility?: AccessibilityOutput;
+  seoDiscovery?: SeoDiscoveryOutput;
+  blockingReasons: string[];
+  revisionInstructions: string[];
+  humanEscalationRequired: boolean;
+  humanEscalationReason?: string;
 }
 
 export interface ReviewOutput {
@@ -16,19 +45,30 @@ export interface ReviewOutput {
   overallStatus: 'passed' | 'needs_revision' | 'blocked';
   warnings: string[];
   corrections: string[];
-  evidence: EvidenceReference[];
+  evidence: (EvidenceRecord | EvidenceReference)[];
   prohibitedTermsFound: string[];
   missingDisclaimers: string[];
   duplicateSimilarity: number;
+  qualityCouncilDetails?: QualityCouncilDetails;
 }
 
 export class ReviewAgent {
   public async execute(task: AgentTask<ReviewInput>): Promise<AgentResult<ReviewOutput>> {
     const startTime = Date.now();
-    
-    // Fetch content item & variants
+    const { contentItemId, brandId, thresholds: customThresholds } = task.input;
+
+    const thresholds: QualityCouncilThresholds = {
+      minBrandScore: customThresholds?.minBrandScore ?? 75,
+      minFactualConfidence: customThresholds?.minFactualConfidence ?? 0.8,
+      maxFactualRisk: customThresholds?.maxFactualRisk ?? 30,
+      maxDuplicateSimilarity: customThresholds?.maxDuplicateSimilarity ?? 0.35,
+      mandatoryAccessibility: customThresholds?.mandatoryAccessibility ?? true,
+      mandatoryHumanReviewCategories: customThresholds?.mandatoryHumanReviewCategories ?? [],
+    };
+
+    // 1. Fetch content item & variants
     const contentItem = await db.contentItem.findUnique({
-      where: { id: task.input.contentItemId },
+      where: { id: contentItemId },
       include: {
         variants: true,
       },
@@ -37,6 +77,7 @@ export class ReviewAgent {
     if (!contentItem) {
       return {
         taskId: task.taskId,
+        agentName: 'QualityCouncil',
         status: 'failed',
         confidence: 0,
         warnings: ['Content item not found'],
@@ -44,44 +85,107 @@ export class ReviewAgent {
       };
     }
 
-    // Fetch brand context
+    // 2. Fetch Brand Context
     const brandCtx = await brandContextAgent.execute({
       taskId: `${task.taskId}_brand`,
-      brandId: task.brandId,
-      input: { brandId: task.brandId, query: contentItem.title },
+      tenantId: task.tenantId || 'tenant-default',
+      brandId: brandId,
+      input: { brandId: brandId, query: contentItem.title },
     });
 
     const prohibitedPhrases = brandCtx.output?.prohibitedPhrases || [];
     const requiredDisclaimers = brandCtx.output?.requiredDisclaimers || [];
-    const groundedChunks = brandCtx.output?.groundedChunks || [];
+    const evidencePack: EvidenceRecord[] = brandCtx.output?.groundedChunks?.map((chunk, idx) => ({
+      evidenceId: `ev_${chunk.chunkId || idx}`,
+      sourceId: chunk.chunkId || `doc_${idx}`,
+      sourceTitle: chunk.filename || 'Brand Knowledge Document',
+      sourceType: 'document',
+      retrievedExcerpt: chunk.content,
+      retrievalDate: new Date().toISOString(),
+      trustLevel: 'VERIFIED_INTERNAL',
+      tenantId: task.tenantId || 'tenant-default',
+      brandId: brandId,
+      chunkId: chunk.chunkId,
+      confidence: 0.95,
+    })) || [];
 
-    // Combine all variant text
+    // Combine variant texts
+    const primaryVariant = contentItem.variants[0];
     const fullContentText = contentItem.variants
       .map((v) => `${v.hook} ${v.bodyText} ${v.ctaText}`)
       .join(' ');
+    const channel = (primaryVariant?.channel || 'linkedin') as 'linkedin' | 'facebook' | 'instagram' | 'telegram';
 
-    const textLower = fullContentText.toLowerCase();
+    // 3. Execute Independent Council Reviewers in Parallel
+    const [factRes, complianceRes, brandRes, accessRes, seoRes] = await Promise.all([
+      factVerificationAgent.execute({
+        taskId: `${task.taskId}_fact`,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId,
+        input: {
+          contentItemId,
+          textToVerify: fullContentText,
+          availableEvidence: evidencePack,
+        },
+      }),
+      complianceAgent.execute({
+        taskId: `${task.taskId}_comp`,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId,
+        input: {
+          contentItemId,
+          channel,
+          text: fullContentText,
+          prohibitedPhrases,
+          requiredDisclaimers,
+        },
+      }),
+      brandCriticAgent.execute({
+        taskId: `${task.taskId}_brandcritic`,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId,
+        input: {
+          contentItemId,
+          headline: primaryVariant?.headline || contentItem.title,
+          bodyText: primaryVariant?.bodyText || fullContentText,
+          brandName: brandCtx.output?.brandName || 'Brand',
+          personality: brandCtx.output?.personality || 'Professional',
+          tone: brandCtx.output?.tone || 'Authoritative',
+          preferredVocabulary: brandCtx.output?.preferredVocabulary || [],
+          targetAudience: brandCtx.output?.targetAudience || 'B2B Buyers',
+        },
+      }),
+      accessibilityAgent.execute({
+        taskId: `${task.taskId}_access`,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId,
+        input: {
+          contentItemId,
+          format: contentItem.format as any,
+          text: fullContentText,
+          altText: primaryVariant?.altText || undefined,
+          visualConcept: primaryVariant?.visualConcept || undefined,
+        },
+      }),
+      seoDiscoveryAgent.execute({
+        taskId: `${task.taskId}_seo`,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId,
+        input: {
+          contentItemId,
+          channel,
+          title: contentItem.title,
+          bodyText: fullContentText,
+          industry: brandCtx.output?.industry || 'Technology',
+          brandKeywords: brandCtx.output?.preferredVocabulary || [],
+        },
+      }),
+    ]);
 
-    // 1. Check prohibited phrases
-    const foundProhibited: string[] = [];
-    for (const phrase of prohibitedPhrases) {
-      if (phrase && textLower.includes(phrase.toLowerCase())) {
-        foundProhibited.push(phrase);
-      }
-    }
-
-    // 2. Check required disclaimers
-    const missingDisclaimers: string[] = [];
-    for (const disclaimer of requiredDisclaimers) {
-      if (disclaimer && !textLower.includes(disclaimer.toLowerCase().slice(0, 20))) {
-        missingDisclaimers.push(disclaimer);
-      }
-    }
-
-    // 3. Duplicate similarity check (compare against existing published items)
+    // 4. Duplicate similarity check
     const existingItems = await db.contentItem.findMany({
       where: {
-        campaign: { brandId: task.brandId },
+        campaign: { brandId },
         id: { not: contentItem.id },
       },
       select: { title: true, coreIdea: true },
@@ -91,68 +195,92 @@ export class ReviewAgent {
     for (const item of existingItems) {
       if (item.title.toLowerCase() === contentItem.title.toLowerCase()) {
         maxSimilarity = 1.0;
-      } else if (textLower.includes(item.coreIdea.toLowerCase().slice(0, 30))) {
+      } else if (fullContentText.toLowerCase().includes(item.coreIdea.toLowerCase().slice(0, 30))) {
         maxSimilarity = Math.max(maxSimilarity, 0.75);
       }
     }
 
-    // 4. Calculate Scores
-    let brandScore = 95;
-    let complianceScore = 98;
-    let factualRiskScore = 10;
-    const warnings: string[] = [];
-    const corrections: string[] = [];
+    // Extract independent outputs
+    const factOutput = factRes.output!;
+    const compOutput = complianceRes.output!;
+    const brandOutput = brandRes.output!;
+    const accessOutput = accessRes.output!;
+    const seoOutput = seoRes.output!;
 
-    if (foundProhibited.length > 0) {
-      brandScore -= 30 * foundProhibited.length;
-      complianceScore -= 40;
-      warnings.push(`Prohibited phrase detected: ${foundProhibited.join(', ')}`);
-      corrections.push(`Remove or rephrase prohibited terms: ${foundProhibited.join(', ')}`);
+    const blockingReasons: string[] = [];
+    const revisionInstructions: string[] = [];
+    let humanEscalationRequired = false;
+    let humanEscalationReason: string | undefined = undefined;
+
+    // Check hard deterministic blocks
+    if (compOutput.deterministicHardBlock) {
+      blockingReasons.push('Compliance Hard Block: Critical secret or security violation detected.');
+    }
+    if (factOutput.hasUnsupportedHighRiskClaim) {
+      blockingReasons.push('Fact Verification Block: High-risk statistical claim lacks RAG evidence verification.');
     }
 
-    if (missingDisclaimers.length > 0) {
-      complianceScore -= 20 * missingDisclaimers.length;
-      warnings.push(`Missing mandatory disclaimers: ${missingDisclaimers.join(', ')}`);
-      corrections.push(`Append required disclaimer text: "${missingDisclaimers[0]}"`);
+    // Check threshold violations
+    if (brandOutput.brandDnaScore < thresholds.minBrandScore) {
+      revisionInstructions.push(`Brand DNA score (${brandOutput.brandDnaScore}) is below minimum threshold (${thresholds.minBrandScore}). ${brandOutput.revisionAdvice}`);
+    }
+    if (factOutput.factualRiskScore > thresholds.maxFactualRisk) {
+      revisionInstructions.push(`Factual risk score (${factOutput.factualRiskScore}) exceeds safe threshold (${thresholds.maxFactualRisk}). Verify or cite claims.`);
+    }
+    if (maxSimilarity > thresholds.maxDuplicateSimilarity) {
+      revisionInstructions.push(`Duplicate content similarity (${(maxSimilarity * 100).toFixed(0)}%) exceeds allowed ceiling (${(thresholds.maxDuplicateSimilarity * 100).toFixed(0)}%).`);
+    }
+    if (thresholds.mandatoryAccessibility && accessOutput.status === 'needs_revision') {
+      revisionInstructions.push(`Accessibility check failed: ${accessOutput.remediations.join('; ')}`);
     }
 
-    if (maxSimilarity > 0.8) {
-      warnings.push(`High content similarity (${(maxSimilarity * 100).toFixed(0)}%) with prior post.`);
-    }
-
-    if (groundedChunks.length === 0) {
-      factualRiskScore += 25;
-      warnings.push('No grounding whitepaper documents found. Claim accuracy risk elevated.');
-    }
-
-    brandScore = Math.max(0, Math.min(100, brandScore));
-    complianceScore = Math.max(0, Math.min(100, complianceScore));
-    factualRiskScore = Math.max(0, Math.min(100, factualRiskScore));
-
-    // Determine Overall Status
+    // Determine Aggregated Council Decision
     let overallStatus: 'passed' | 'needs_revision' | 'blocked' = 'passed';
-    if (foundProhibited.length > 0 || complianceScore < 60) {
+    if (blockingReasons.length > 0 || compOutput.status === 'block') {
       overallStatus = 'blocked';
-    } else if (brandScore < 80 || missingDisclaimers.length > 0 || maxSimilarity > 0.8) {
+    } else if (revisionInstructions.length > 0 || factOutput.status === 'needs_revision' || brandOutput.status === 'needs_revision') {
       overallStatus = 'needs_revision';
     }
 
+    const warnings: string[] = [
+      ...compOutput.violations.map((v) => v.message),
+      ...brandOutput.deviations.map((d) => d.description),
+      ...accessOutput.issues.map((i) => i.description),
+    ];
+
+    const corrections: string[] = [
+      ...compOutput.violations.map((v) => v.recommendedCorrection),
+      ...brandOutput.deviations.map((d) => d.suggestedRevision),
+      ...accessOutput.remediations,
+    ];
+
     const output: ReviewOutput = {
-      brandScore,
-      factualRiskScore,
-      complianceScore,
+      brandScore: brandOutput.brandDnaScore,
+      factualRiskScore: factOutput.factualRiskScore,
+      complianceScore: compOutput.complianceScore,
       originalityScore: Math.round((1 - maxSimilarity) * 100),
-      readabilityScore: 90,
+      readabilityScore: accessOutput.accessibilityScore,
       overallStatus,
       warnings,
       corrections,
-      evidence: brandCtx.evidence,
-      prohibitedTermsFound: foundProhibited,
-      missingDisclaimers,
+      evidence: evidencePack,
+      prohibitedTermsFound: compOutput.prohibitedPhrasesFound,
+      missingDisclaimers: compOutput.missingDisclaimersFound,
       duplicateSimilarity: maxSimilarity,
+      qualityCouncilDetails: {
+        factVerification: factOutput,
+        compliance: compOutput,
+        brandCritic: brandOutput,
+        accessibility: accessOutput,
+        seoDiscovery: seoOutput,
+        blockingReasons,
+        revisionInstructions,
+        humanEscalationRequired,
+        humanEscalationReason,
+      },
     };
 
-    // Save or update ReviewResult in DB
+    // Save or update ReviewResult in Database
     await db.reviewResult.upsert({
       where: { contentItemId: contentItem.id },
       update: {
@@ -190,17 +318,25 @@ export class ReviewAgent {
 
     return {
       taskId: task.taskId,
+      agentName: 'QualityCouncilCoordinator',
       status: overallStatus === 'passed' ? 'completed' : overallStatus === 'needs_revision' ? 'needs_revision' : 'blocked',
       output,
       confidence: 0.96,
       warnings,
-      evidence: brandCtx.evidence,
+      evidence: evidencePack,
+      evaluationScores: {
+        brandScore: output.brandScore,
+        factualRiskScore: output.factualRiskScore,
+        complianceScore: output.complianceScore,
+        accessibilityScore: accessOutput.accessibilityScore,
+        seoDiscoveryScore: seoOutput.discoveryScore,
+      },
       usage: {
         latencyMs: Date.now() - startTime,
       },
       provenance: {
-        model: 'review-agent-v1',
-        promptVersion: 'v1.0-review',
+        model: 'quality-council-coordinator-v1',
+        promptVersion: 'v1.0',
         policyVersion: 'v1.0',
       },
     };
@@ -208,3 +344,16 @@ export class ReviewAgent {
 }
 
 export const reviewAgent = new ReviewAgent();
+
+// Register in AgentRegistry
+agentRegistry.register({
+  name: 'ReviewAgent',
+  version: '1.0.0',
+  description: 'Quality Council Coordinator aggregating Fact Verification, Compliance, Brand Critic, Accessibility, and SEO agents',
+  executionMode: 'hybrid',
+  inputSchema: undefined as any,
+  outputSchema: undefined as any,
+  allowedTools: ['quality_council_evaluator'],
+  enabled: true,
+  handler: (task) => reviewAgent.execute(task),
+});

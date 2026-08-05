@@ -21,6 +21,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const taskId = `task_rev_${item.id}_${Date.now()}`;
       const res = await reviewAgent.execute({
         taskId,
+        tenantId: 'tenant-default',
         brandId: campaign.brandId,
         campaignId: campaign.id,
         input: {

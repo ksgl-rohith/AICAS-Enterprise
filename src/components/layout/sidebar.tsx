@@ -14,8 +14,14 @@ import {
   Settings,
   Bot,
   Sparkles,
-  ChevronRight,
   ShieldCheck,
+  FlaskConical,
+  DollarSign,
+  AlertTriangle,
+  MessageSquare,
+  Globe,
+  Video,
+  Sliders,
 } from 'lucide-react';
 
 const navigation = [
@@ -25,6 +31,14 @@ const navigation = [
   { name: 'Approval Queue', href: '/approvals', icon: CheckCircle2, badge: 'Review' },
   { name: 'Calendar & Schedule', href: '/calendar', icon: CalendarDays },
   { name: 'Analytics & Growth', href: '/analytics', icon: BarChart3 },
+  { name: 'Experiments & A/B', href: '/experiments', icon: FlaskConical },
+  { name: 'Recommendations', href: '/recommendations', icon: Sparkles },
+  { name: 'Cost Governance', href: '/cost-governance', icon: DollarSign },
+  { name: 'Fatigue & Decay', href: '/fatigue', icon: AlertTriangle },
+  { name: 'Community Inbox', href: '/community', icon: MessageSquare },
+  { name: 'Localization', href: '/localization', icon: Globe },
+  { name: 'Video Packages', href: '/video', icon: Video },
+  { name: 'Controlled Autonomy', href: '/autonomy', icon: Sliders },
   { name: 'Audit Timeline', href: '/activity', icon: History },
   { name: 'Platform Integrations', href: '/settings/integrations', icon: Settings, highlight: true },
 ];
@@ -43,10 +57,10 @@ export function Sidebar() {
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-slate-900 dark:text-white tracking-tight text-base">AICAS</span>
             <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-              Lite
+              Enterprise
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Multi-Agent Content OS</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Multi-Agent Growth OS</p>
         </div>
       </div>
 
@@ -76,7 +90,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+              className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                 isActive
                   ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
@@ -105,9 +119,9 @@ export function Sidebar() {
           <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
           <div className="truncate">
             <span className="font-semibold text-slate-800 dark:text-slate-200 block text-[11px]">
-              Engine Guardrails Active
+              Controlled Autonomy Active
             </span>
-            <span className="text-[10px] text-slate-400">RAG + Review Council</span>
+            <span className="text-[10px] text-slate-400">Phase 3 Growth Platform</span>
           </div>
         </div>
       </div>

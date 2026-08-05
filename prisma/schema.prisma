@@ -362,3 +362,286 @@ model PlatformConnection {
 
   @@unique([brandId, platform])
 }
+
+model WorkflowInstance {
+  id              String   @id @default(cuid())
+  workflowId      String   @unique
+  workflowName    String   // 'campaign-workflow', 'content-generation-workflow', 'approval-workflow', etc.
+  tenantId        String   @default("tenant-default")
+  brandId         String?
+  campaignId      String?
+  status          String   @default("RUNNING") // 'RUNNING', 'WAITING_APPROVAL', 'SCHEDULED_TIMER', 'COMPLETED', 'FAILED', 'CANCELLED'
+  currentStep     String
+  inputJson       String
+  stateJson       String
+  historyJson     String?
+  errorDetails    String?
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ApprovalRequest {
+  id                   String   @id @default(cuid())
+  tenantId             String   @default("tenant-default")
+  brandId              String
+  campaignId           String?
+  contentItemId        String
+  oversightMode        String   @default("APPROVAL_REQUIRED") // 'COPILOT', 'APPROVAL_REQUIRED', 'RISK_BASED', 'AUTONOMOUS'
+  riskCategory         String   @default("NORMAL")
+  mandatoryApproval    Boolean  @default(true)
+  mandatoryReason      String?
+  assignedReviewerId   String?
+  status               String   @default("PENDING") // 'PENDING', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED'
+  commentsJson         String?  // JSON array of comments [{reviewerId, comment, timestamp}]
+  slaHours             Int      @default(24)
+  concurrencyVersion   Int      @default(1)
+  requestedAt          DateTime @default(now())
+  decidedAt            DateTime?
+  updatedAt            DateTime @updatedAt
+}
+
+model PublicationLedgerEntry {
+  id                 String    @id @default(cuid())
+  publicationId     String    @unique
+  tenantId          String    @default("tenant-default")
+  campaignId        String
+  contentItemId     String
+  contentVariantId  String
+  platform          String    // 'linkedin', 'facebook', 'instagram', 'telegram'
+  connectorAccountId String?
+  idempotencyKey    String    @unique
+  requestChecksum   String
+  intendedSchedule  DateTime
+  attemptCount      Int       @default(0)
+  currentState      String    @default("PENDING") // 'PENDING', 'IN_FLIGHT', 'PUBLISHED', 'FAILED_TRANSIENT', 'FAILED_PERMANENT', 'RECONCILING'
+  platformPostId    String?
+  permalink         String?
+  publishedAt       DateTime?
+  reconciliationStatus String @default("OK") // 'OK', 'NEEDS_RECONCILIATION', 'RECONCILED'
+  lastErrorDetails  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model DeadLetterItem {
+  id               String   @id @default(cuid())
+  tenantId         String   @default("tenant-default")
+  publicationId   String?
+  workflowId       String?
+  platform         String
+  errorCategory    String   // 'CREDENTIAL_EXPIRED', 'RATE_LIMIT_EXHAUSTED', 'PERMANENT_POLICY', 'NETWORK_TIMEOUT'
+  errorMessage     String
+  payloadJson      String
+  retryCount       Int      @default(0)
+  status           String   @default("OPEN") // 'OPEN', 'RESOLVED_MANUAL', 'RESOLVED_RETRY', 'DISCARDED'
+  resolutionNote   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model CrisisPauseLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("tenant-default")
+  brandId     String
+  campaignId  String?
+  action      String   // 'PAUSED', 'RESUMED'
+  reason      String
+  initiatedBy String
+  pausedAt    DateTime @default(now())
+  resumedAt   DateTime?
+}
+
+model DomainEventRecord {
+  id            String   @id @default(cuid())
+  eventId       String   @unique
+  eventVersion  String   @default("v1.0")
+  eventType     String   // 'content.approved', 'publication.succeeded', etc.
+  tenantId      String   @default("tenant-default")
+  correlationId String
+  causationId   String?
+  producer      String
+  payloadJson   String
+  occurredAt    DateTime @default(now())
+}
+
+model NormalizedMetricEvent {
+  id               String   @id @default(cuid())
+  eventId          String   @unique
+  tenantId         String   @default("tenant-default")
+  brandId          String
+  campaignId       String?
+  contentId        String?
+  contentVersionId String?
+  publicationId    String?
+  experimentId     String?
+  platform         String   // 'linkedin', 'facebook', 'instagram', 'telegram', 'youtube', etc.
+  eventType        String   // 'snapshot', 'conversion', 'interaction', 'correction'
+  occurredAt       DateTime
+  receivedAt       DateTime @default(now())
+  metricsJson      String   // Normalized metrics (impressions, reach, reactions, comments, shares, saves, clicks, ctr, watchTime, videoCompletion, followerGrowth, leads, conversions, sentiment, responseTime, cpo)
+  dimensionsJson   String?  // Dimensions (device, geography, demography, placement)
+  source           String   @default("PLATFORM_API")
+  schemaVersion    String   @default("v1.0")
+  rawPayloadJson   String?
+  dedupHash        String   @unique
+  createdAt        DateTime @default(now())
+}
+
+model Experiment {
+  id                   String   @id @default(cuid())
+  tenantId             String   @default("tenant-default")
+  brandId              String
+  name                 String
+  hypothesis           String
+  primaryMetric        String
+  guardrailMetricsJson String   // JSON array of metric names
+  targetPopulation     String
+  variantsJson         String   // JSON array of variant specs [{id, name, contentVariantId, weight, configJson}]
+  assignmentMethod     String   @default("DETERMINISTIC_HASH") // 'DETERMINISTIC_HASH', 'BANDIT', 'HOLDOUT'
+  startRulesJson       String
+  stopRulesJson        String
+  minSampleRequirements Int     @default(100)
+  risksJson            String?
+  status               String   @default("DRAFT") // 'DRAFT', 'RUNNING', 'PAUSED', 'CONCLUDED', 'CANCELLED'
+  winnerVariantId      String?
+  startDate            DateTime?
+  endDate              DateTime?
+  evaluatedAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  assignments ExperimentAssignment[]
+}
+
+model ExperimentAssignment {
+  id             String     @id @default(cuid())
+  experimentId   String
+  experiment     Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  tenantId       String     @default("tenant-default")
+  userIdOrSubjectId String
+  variantId      String
+  assignedAt     DateTime   @default(now())
+
+  @@unique([experimentId, tenantId, userIdOrSubjectId])
+}
+
+model LearningMemoryItem {
+  id                    String    @id @default(cuid())
+  tenantId              String    @default("tenant-default")
+  brandId               String
+  learnedPreference     String
+  supportingEvidenceJson String   // JSON array of evidence refs or experiment IDs
+  confidence            Float
+  scopeTenant           String    @default("tenant-default")
+  scopeBrand            String
+  scopeCampaignType     String?
+  scopeAudience         String?
+  scopeChannel          String?
+  scopeLocale           String?
+  expiry                DateTime?
+  status                String    @default("PROPOSED") // 'PROPOSED', 'TEMPORARY_OBSERVATION', 'APPROVED_LEARNED_POLICY', 'ROLLED_BACK'
+  approverId            String?
+  rollbackRef           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model CostBudget {
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  monthlyBudgetUsd  Float    @default(500.0)
+  campaignBudgetUsd Float    @default(100.0)
+  taskTokenBudget   Int      @default(50000)
+  mediaBudgetUsd    Float    @default(50.0)
+  spentUsd          Float    @default(0.0)
+  tokensUsed        Int      @default(0)
+  updatedAt         DateTime @updatedAt
+}
+
+model CostUsageRecord {
+  id               String   @id @default(cuid())
+  tenantId         String   @default("tenant-default")
+  brandId          String?
+  campaignId       String?
+  agentName        String
+  modelName        String
+  tier             String   @default("STANDARD") // 'ECONOMY', 'STANDARD', 'PREMIUM'
+  inputTokens      Int
+  outputTokens     Int
+  estimatedCostUsd Float
+  actualCostUsd    Float
+  isAnomaly        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model CommunityMessage {
+  id                 String    @id @default(cuid())
+  tenantId           String    @default("tenant-default")
+  brandId            String
+  platform           String    // 'linkedin', 'facebook', 'instagram', 'telegram'
+  externalMessageId  String    @unique
+  senderHandle       String
+  content            String
+  classification     String    // 'POSITIVE', 'NEUTRAL', 'NEGATIVE', 'QUESTION', 'SUPPORT_REQUEST', 'SALES_LEAD', 'SPAM', 'ABUSE', 'SENSITIVE', 'CRISIS_RISK'
+  suggestedResponse  String?
+  isEscalated        Boolean   @default(false)
+  escalationReason   String?
+  status             String    @default("INBOX") // 'INBOX', 'DRAFTED', 'APPROVED_FOR_POSTING', 'POSTED', 'REJECTED'
+  reviewedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model LocalizedContent {
+  id                      String   @id @default(cuid())
+  tenantId                String   @default("tenant-default")
+  sourceContentId         String
+  sourceVariantId         String?
+  locale                  String   // e.g., 'es-ES', 'fr-FR', 'de-DE', 'ja-JP'
+  translatedHeadline      String?
+  translatedBody          String
+  translatedCTA           String
+  transcreationNotes      String?
+  lineageJson             String   // Source-to-localized tracking details
+  isCulturallySensitive   Boolean  @default(false)
+  policyValidationStatus  String   @default("PASSED") // 'PASSED', 'FLAGGED', 'NEEDS_REVIEW'
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model VideoPackage {
+  id                        String   @id @default(cuid())
+  tenantId                  String   @default("tenant-default")
+  contentItemId             String
+  hook                      String
+  script                    String
+  sceneSequenceJson         String   // JSON array of scene objects [{sceneNumber, durationSec, visualDescription, audioScript, textOverlay}]
+  storyboardJson            String   // JSON array of storyboard frame directions
+  brollSuggestionsJson      String   // JSON array of B-roll tags
+  onScreenText              String
+  voiceoverText             String
+  subtitleCaptionContent    String
+  thumbnailBrief            String
+  durationEstimateSeconds   Int
+  aspectRatiosJson          String   // JSON array of strings e.g. ["9:16", "1:1", "16:9"]
+  safeAreaInstructions      String
+  accessibilityNotes        String
+  consistencyValidationJson String   // JSON object with score and issues
+  renderingProviderStatus   String   @default("PREVIEW_GENERATED") // 'PREVIEW_GENERATED', 'QUEUED_RENDER', 'RENDERED', 'FAILED'
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
+
+model CreativeFatigueRecord {
+  id             String   @id @default(cuid())
+  tenantId       String   @default("tenant-default")
+  brandId        String
+  contentId      String
+  fatigueType    String   // 'REPEATED_HOOK', 'NEAR_DUPLICATE_CAPTION', 'REPEATED_VISUAL', 'OVERUSED_CTA', 'DECLINING_ENGAGEMENT', 'EXCESSIVE_TOPIC_FREQ', 'EXPIRED_TREND', 'CHANNEL_OVERPOSTING'
+  similarityScore Float
+  explanation    String
+  detectedAt     DateTime @default(now())
+}
+
+

@@ -26,6 +26,7 @@ describe('Strategy Generation Brand Alignment Test', () => {
 
     const result = await strategyAgent.execute({
       taskId: 'test_task_coffee_strategy',
+      tenantId: 'tenant-default',
       brandId: testBrand.id,
       input: {
         campaignId: 'test_campaign_id',

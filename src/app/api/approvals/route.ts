@@ -1,89 +1,41 @@
-import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { approvalService } from '@/lib/approval/approval-service';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const items = await db.contentItem.findMany({
-      include: {
-        campaign: {
-          include: { brand: true },
-        },
-        variants: true,
-        reviewResult: true,
-        approvals: {
-          orderBy: { decidedAt: 'desc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const { searchParams } = new URL(req.url);
+    const tenantId = searchParams.get('tenantId') || 'tenant-default';
+    const status = searchParams.get('status') || 'PENDING';
 
-    return NextResponse.json(items);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const queue = await approvalService.getApprovalQueue(tenantId, status);
+    return NextResponse.json({ success: true, count: queue.length, queue });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { contentItemId, decision, comment, editedContent } = body;
+    const { action, approvalId, reviewerId, comment, expectedVersion } = body;
 
-    const contentItem = await db.contentItem.findUnique({
-      where: { id: contentItemId },
-      include: { campaign: true },
-    });
-
-    if (!contentItem) {
-      return NextResponse.json({ error: 'Content item not found' }, { status: 404 });
+    if (action === 'approve') {
+      const res = await approvalService.approve(approvalId, reviewerId || 'user_reviewer', comment, expectedVersion || 1);
+      return NextResponse.json({ success: true, approval: res });
     }
 
-    const user = await db.user.findFirst();
-
-    // Create approval record
-    const approval = await db.approval.create({
-      data: {
-        contentItemId,
-        reviewerId: user?.id || null,
-        decision, // 'APPROVED', 'REVISION_REQUESTED', 'REJECTED'
-        comment: comment || null,
-        editedContent: editedContent || null,
-      },
-    });
-
-    // Update ContentItem status
-    let newStatus = 'IN_REVIEW';
-    if (decision === 'APPROVED') {
-      newStatus = 'APPROVED';
-    } else if (decision === 'REVISION_REQUESTED') {
-      newStatus = 'NEEDS_REVISION';
-    } else if (decision === 'REJECTED') {
-      newStatus = 'REJECTED';
+    if (action === 'reject') {
+      const res = await approvalService.reject(approvalId, reviewerId || 'user_reviewer', comment || 'Rejected', expectedVersion || 1);
+      return NextResponse.json({ success: true, approval: res });
     }
 
-    await db.contentItem.update({
-      where: { id: contentItemId },
-      data: { status: newStatus },
-    });
+    if (action === 'request_revision') {
+      const res = await approvalService.requestRevision(approvalId, reviewerId || 'user_reviewer', comment || 'Revision requested', expectedVersion || 1);
+      return NextResponse.json({ success: true, approval: res });
+    }
 
-    // Audit event
-    await db.auditEvent.create({
-      data: {
-        userId: user?.id,
-        brandId: contentItem.campaign.brandId,
-        campaignId: contentItem.campaignId,
-        action: decision === 'APPROVED' ? 'APPROVED' : decision === 'REVISION_REQUESTED' ? 'REVISION_REQUESTED' : 'REJECTED',
-        details: `Content item "${contentItem.title}" decision: ${decision}. ${comment ? `Comment: ${comment}` : ''}`,
-        entityType: 'ContentItem',
-        entityId: contentItemId,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      approval,
-      newStatus,
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Invalid approval action' }, { status: 400 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
