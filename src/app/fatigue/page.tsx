@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertTriangle, Eye, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Eye } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Badge } from '@/components/ui/badge';
 
 export default function FatiguePage() {
   const [warnings] = useState([
@@ -25,41 +27,46 @@ export default function FatiguePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-400" /> Creative Fatigue & Content Decay Warnings
-        </h1>
-        <p className="text-xs text-slate-400">
-          Embedding and metadata similarity analysis detecting hook repetition, CTA saturation, and audience fatigue.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Intelligence & Growth"
+        title="Creative Fatigue & Content Decay Warnings"
+        description="Embedding and metadata similarity analysis detecting hook repetition, CTA saturation, and audience fatigue."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Intelligence & Growth' },
+          { label: 'Fatigue & Decay' },
+        ]}
+        actions={
+          <Badge variant="amber" icon={<AlertTriangle className="w-3.5 h-3.5" />}>
+            {warnings.length} Active Warnings
+          </Badge>
+        }
+      />
 
-      <div className="p-6 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-4">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">
-          <Eye className="w-4 h-4 text-amber-400" /> Detected Fatigue Signals (Explainable Similarity)
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <Eye className="w-4 h-4 text-amber-500" /> Detected Fatigue Signals (Explainable Similarity)
         </h2>
 
         <div className="space-y-3 text-xs">
           {warnings.map((w) => (
-            <div key={w.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div key={w.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {w.fatigueType}
-                </span>
-                <span className="text-[10px] text-slate-400">
+                <Badge variant="amber">{w.fatigueType}</Badge>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                   Similarity Score: {(w.similarityScore * 100).toFixed(0)}%
                 </span>
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-bold text-white text-sm">{w.contentTitle}</h3>
-                <p className="text-slate-300">{w.explanation}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">{w.contentTitle}</h3>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{w.explanation}</p>
               </div>
 
-              <div className="text-[10px] text-slate-500 flex items-center gap-2 pt-2 border-t border-slate-800">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <span>Detected: {new Date(w.detectedAt).toLocaleString()}</span>
                 <span>•</span>
-                <span className="text-amber-400 font-semibold">Policy Enforcement: Require Revision</span>
+                <span className="text-amber-700 dark:text-amber-400 font-semibold">Policy Enforcement: Require Revision</span>
               </div>
             </div>
           ))}

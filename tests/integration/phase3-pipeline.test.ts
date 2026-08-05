@@ -85,6 +85,8 @@ describe('Phase 3 Complete Closed-Loop End-to-End Campaign Lifecycle Integration
       platform: 'linkedin',
       eventType: 'snapshot',
       occurredAt: new Date().toISOString(),
+      source: 'api',
+      schemaVersion: '1.0',
       metrics: {
         impressions: 15000,
         reach: 12000,

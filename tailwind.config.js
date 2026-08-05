@@ -9,6 +9,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        canvas: "var(--canvas-bg)",
+        surface: {
+          DEFAULT: "var(--surface-card)",
+          card: "var(--surface-card)",
+          elevated: "var(--surface-elevated)",
+          inset: "var(--surface-inset)",
+          hover: "var(--surface-hover)",
+        },
+        tprimary: "var(--text-primary)",
+        tsecondary: "var(--text-secondary)",
+        tmuted: "var(--text-muted)",
+        bsubtle: "var(--border-subtle)",
+        bstrong: "var(--border-strong)",
         brand: {
           50: '#f0f3ff',
           100: '#e1e7fe',

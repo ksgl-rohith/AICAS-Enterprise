@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MessageSquare, AlertTriangle, ShieldCheck, Send, CheckCircle2, User } from 'lucide-react';
+import { MessageSquare, AlertTriangle, Send, User } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Badge } from '@/components/ui/badge';
 
 export default function CommunityPage() {
   const [messages, setMessages] = useState([
@@ -36,65 +38,69 @@ export default function CommunityPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-indigo-400" /> Community Review Inbox & Escalations
-          </h1>
-          <p className="text-xs text-slate-400">
-            10-category message classification, AI response drafting, safety review, and crisis escalation.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Content Operations"
+        title="Community Review Inbox & Escalations"
+        description="10-category message classification, AI response drafting, safety review, and crisis escalation."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Content Operations' },
+          { label: 'Community Inbox' },
+        ]}
+        actions={
+          <Badge variant="amber" icon={<MessageSquare className="w-3.5 h-3.5" />}>
+            Autonomous Posting: OFF (Review Required)
+          </Badge>
+        }
+      />
 
-        <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-          Autonomous Posting: OFF (Review Required)
-        </span>
-      </div>
-
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white">Community Messages Inbox</h2>
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white">Community Messages Inbox</h2>
 
         <div className="space-y-4 text-xs">
           {messages.map((msg) => (
-            <div key={msg.id} className={`p-4 rounded-xl bg-slate-950 border space-y-3 ${msg.isEscalated ? 'border-red-500/40' : 'border-slate-800'}`}>
+            <div
+              key={msg.id}
+              className={`p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border space-y-3 ${
+                msg.isEscalated ? 'border-red-300 dark:border-red-900/60' : 'border-slate-200 dark:border-slate-800'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-bold text-white">{msg.senderHandle}</span>
-                  <span className="text-[10px] text-indigo-400 uppercase font-mono">[{msg.platform}]</span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                    msg.isEscalated ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-indigo-500/20 text-indigo-300'
-                  }`}>
+                  <span className="font-bold text-slate-900 dark:text-white">{msg.senderHandle}</span>
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-mono">[{msg.platform}]</span>
+                  <Badge variant={msg.isEscalated ? 'red' : 'indigo'}>
                     {msg.classification}
-                  </span>
+                  </Badge>
                 </div>
 
-                <span className="text-[10px] text-slate-400">Status: {msg.status}</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">Status: {msg.status}</span>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-200">
+              <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
                 "{msg.content}"
               </div>
 
               {msg.suggestedResponse && (
-                <div className="p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/20 space-y-1">
-                  <span className="text-[10px] text-indigo-400 uppercase font-bold block">Drafted Brand AI Response</span>
-                  <p className="text-slate-200">{msg.suggestedResponse}</p>
+                <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 space-y-1">
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-bold block">Drafted Brand AI Response</span>
+                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{msg.suggestedResponse}</p>
                 </div>
               )}
 
               {msg.isEscalated && (
-                <div className="p-3 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300 text-[11px] flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-[11px] flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
                   <span>ESCALATED: {msg.escalationReason} Sent to legal/PR escalation queue.</span>
                 </div>
               )}
 
               {msg.status === 'INBOX' && !msg.isEscalated && (
-                <div className="flex justify-end pt-2 border-t border-slate-800">
+                <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
                   <button
                     onClick={() => handleApprove(msg.id)}
-                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 transition-all"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Approve & Send Reply</span>

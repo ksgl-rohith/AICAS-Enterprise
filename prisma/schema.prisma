@@ -19,6 +19,41 @@ model User {
   brands     Brand[]
   approvals  Approval[]
   auditEvents AuditEvent[]
+  preferences UserPreferences?
+}
+
+model UserPreferences {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme                   String   @default("system")
+  density                 String   @default("comfortable")
+  sidebarDefault          String   @default("expanded")
+  reducedMotion           Boolean  @default(false)
+  timezone                String   @default("UTC")
+  locale                  String   @default("en-US")
+  dateFormat              String   @default("YYYY-MM-DD")
+  timeFormat              String   @default("24h")
+  firstDayOfWeek          String   @default("monday")
+  defaultBrandId          String?
+  defaultApprovalMode     String   @default("APPROVAL_REQUIRED")
+  defaultCalendarView     String   @default("month")
+  defaultLanguage         String   @default("en-US")
+  defaultReportingPeriod  String   @default("30d")
+  allowedAiProvider       String   @default("gemini")
+  allowedDefaultTextModel String   @default("gemini-2.5-flash")
+  allowedImageModel       String   @default("imagen-3")
+  executionMode           String   @default("mock")
+  fallbackBehavior        String   @default("mock_fallback")
+  costWarningThresholdUsd Float    @default(250.0)
+  notifyApprovals         Boolean  @default(true)
+  notifyFailures          Boolean  @default(true)
+  notifyCredentialWarnings Boolean @default(true)
+  notifyCampaignCompletion Boolean @default(true)
+  notifyCostThreshold     Boolean  @default(true)
+  notifyRiskEscalation    Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model Brand {

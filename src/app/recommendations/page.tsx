@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, CheckCircle, XCircle, ShieldCheck, History, ArrowUpRight } from 'lucide-react';
+import { Sparkles, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Badge } from '@/components/ui/badge';
 
 export default function RecommendationsPage() {
   const [recommendations, setRecommendations] = useState([
@@ -18,7 +20,7 @@ export default function RecommendationsPage() {
     },
   ]);
 
-  const [policies, setPolicies] = useState([
+  const [policies] = useState([
     {
       id: 'policy_01',
       learnedPreference: 'Technical carousels outperform text posts on LinkedIn by +240% CTR',
@@ -43,64 +45,60 @@ export default function RecommendationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-purple-400" /> Optimization Recommendation & Policy Memory Inbox
-        </h1>
-        <p className="text-xs text-slate-400">
-          Review next-post recommendations, evidence provenance, and versioned learning policies before activation.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Intelligence & Growth"
+        title="Optimization Recommendations & Policy Memory"
+        description="Review next-post recommendations, evidence provenance, and versioned learning policies before activation."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Intelligence & Growth' },
+          { label: 'Recommendations' },
+        ]}
+      />
 
       {/* Recommendation Inbox */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white">Pending Next-Post Recommendations</h2>
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white">Pending Next-Post Recommendations</h2>
 
         <div className="space-y-3 text-xs">
           {recommendations.map((rec) => (
-            <div key={rec.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+            <div key={rec.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-indigo-400 uppercase">{rec.targetChannel}</span>
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                    Source: {rec.source}
-                  </span>
-                  <span className="text-[10px] text-slate-400">Confidence: {(rec.confidence * 100).toFixed(0)}%</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase">{rec.targetChannel}</span>
+                  <Badge variant="purple">Source: {rec.source}</Badge>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Confidence: {(rec.confidence * 100).toFixed(0)}%</span>
                 </div>
 
-                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                  rec.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                  rec.status === 'rejected' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                  'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}>
+                <Badge variant={rec.status === 'approved' ? 'emerald' : rec.status === 'rejected' ? 'red' : 'amber'}>
                   Status: {rec.status}
-                </span>
+                </Badge>
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-bold text-white text-sm">{rec.recommendedTopic}</h3>
-                <p className="text-slate-300">{rec.explanation}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">{rec.recommendedTopic}</h3>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{rec.explanation}</p>
               </div>
 
               {rec.proposedPolicyUpdate && (
-                <div className="p-3 rounded-lg bg-slate-900 border border-purple-500/20 space-y-1">
-                  <span className="text-[10px] text-purple-400 uppercase font-bold block">Proposed Policy Memory Update</span>
-                  <p className="text-slate-200">{rec.proposedPolicyUpdate}</p>
+                <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-900/40 space-y-1">
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase font-bold block">Proposed Policy Memory Update</span>
+                  <p className="text-slate-800 dark:text-slate-200">{rec.proposedPolicyUpdate}</p>
                 </div>
               )}
 
               {rec.status === 'proposed' && (
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <button
                     onClick={() => handleReject(rec.id)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-1 transition-colors"
                   >
-                    <XCircle className="w-3.5 h-3.5 text-red-400" />
+                    <XCircle className="w-3.5 h-3.5 text-red-500" />
                     <span>Reject</span>
                   </button>
                   <button
                     onClick={() => handleApprove(rec.id)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1 shadow-md"
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1 shadow-sm shadow-emerald-600/30 transition-all"
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
                     <span>Approve Policy Update</span>
@@ -113,23 +111,21 @@ export default function RecommendationsPage() {
       </div>
 
       {/* Approved Learning Memory */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" /> Active Approved Learned Policies
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Active Approved Learned Policies
         </h2>
 
         <div className="space-y-2 text-xs">
           {policies.map((p) => (
-            <div key={p.id} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div key={p.id} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
-                <span className="font-bold text-white block">{p.learnedPreference}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-bold text-slate-900 dark:text-white block">{p.learnedPreference}</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
                   Scope: {p.scopeChannel} | Approver: {p.approverId} | Confidence: {(p.confidence * 100).toFixed(0)}%
                 </span>
               </div>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
-                IMMUTABLE BRAND RULES PROTECTED
-              </span>
+              <Badge variant="emerald">IMMUTABLE BRAND RULES PROTECTED</Badge>
             </div>
           ))}
         </div>

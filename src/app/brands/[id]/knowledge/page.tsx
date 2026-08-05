@@ -2,14 +2,31 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Upload, FileText, CheckCircle2, Search, Database, Layers, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
+  CheckCircle2,
+  Search,
+  Database,
+  Layers,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw,
+  Trash2,
+  FileCode,
+} from 'lucide-react';
+import {
+  BrandDocumentUploader,
+  UploadedFileItem,
+} from '@/components/ui/brand-document-uploader';
 
 export default function BrandKnowledgePage({ params }: { params: { id: string } }) {
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [stagedFiles, setStagedFiles] = useState<UploadedFileItem[]>([]);
   const [manualText, setManualText] = useState('');
   const [docTitle, setDocTitle] = useState('');
 
@@ -27,46 +44,52 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
     fetchBrand();
   }, [params.id]);
 
-  const handleUpload = async (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file && !manualText) {
-      alert('Please select a PDF/Word file or paste text content.');
+    if (stagedFiles.length === 0 && !manualText) {
+      alert('Please select or drag files, or enter text to ingest.');
       return;
     }
 
     setUploading(true);
-    const formData = new FormData();
-    if (file) {
-      formData.append('file', file);
-    } else {
-      formData.append('filename', docTitle || 'Company_Knowledge_Doc.txt');
-      formData.append('textContent', manualText);
-    }
 
     try {
-      const res = await fetch(`/api/brands/${params.id}/knowledge`, {
-        method: 'POST',
-        body: formData,
-      });
+      if (stagedFiles.length > 0) {
+        for (const item of stagedFiles) {
+          const formData = new FormData();
+          formData.append('file', item.file);
+          formData.append('title', item.title || item.name);
 
-      const data = await res.json();
-      if (res.ok) {
-        setFile(null);
+          await fetch(`/api/brands/${params.id}/knowledge`, {
+            method: 'POST',
+            body: formData,
+          });
+        }
+        setStagedFiles([]);
+      } else if (manualText) {
+        const formData = new FormData();
+        formData.append('filename', docTitle || 'Knowledge_Notes.txt');
+        formData.append('textContent', manualText);
+
+        await fetch(`/api/brands/${params.id}/knowledge`, {
+          method: 'POST',
+          body: formData,
+        });
+
         setManualText('');
         setDocTitle('');
-        fetchBrand();
-      } else {
-        alert(data.error || 'Failed to upload document.');
       }
+
+      fetchBrand();
     } catch {
-      alert('Upload error.');
+      alert('Upload error during document ingestion.');
     } finally {
       setUploading(false);
     }
   };
 
   if (loading || !brand) {
-    return <div className="text-center py-12 text-slate-500 text-xs">Loading Grounded Knowledge Base...</div>;
+    return <div className="text-center py-16 text-slate-500 text-xs">Loading Grounded Knowledge Base...</div>;
   }
 
   const docs = brand.knowledgeDocs || [];
@@ -77,7 +100,7 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
     : chunks;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
         <Link href="/brands" className="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all">
           <ArrowLeft className="w-4 h-4" />
@@ -85,70 +108,63 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Grounded RAG Knowledge Base</h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               {brand.name}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Ingest corporate whitepapers, PDFs, Word (.doc/.docx), TXT, and Markdown files. AI agents retrieve evidence directly from these chunks.
+            Ingest corporate whitepapers, PDFs, TXT, and Markdown documents. AI agents extract and ground campaign text using these chunks.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Document Upload Form */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl h-fit">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs h-fit">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Upload className="w-4 h-4 text-indigo-500" /> Ingest Knowledge Document
+              <Upload className="w-4 h-4 text-indigo-500" /> Ingest Documents
             </h2>
             <span className="text-xs font-semibold text-slate-400">{docs.length}/10 Files</span>
           </div>
 
-          <form onSubmit={handleUpload} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                Select Company File (PDF, Word, TXT, MD)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.txt,.md"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="w-full text-xs text-slate-700 dark:text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
-              />
+          <form onSubmit={handleUploadSubmit} className="space-y-4">
+            <BrandDocumentUploader
+              files={stagedFiles}
+              onChange={setStagedFiles}
+            />
+
+            <div className="text-center text-[10px] text-slate-400 uppercase font-semibold py-1">
+              OR PASTE RAW TEXT / WHITEPAPER EXCERPT
             </div>
 
-            <div className="text-center text-[10px] text-slate-400 uppercase font-semibold">OR PASTE RAW TEXT DIRECTLY</div>
-
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Document Title</label>
               <input
                 type="text"
-                placeholder="e.g. ApexAI Product Architecture 2026.docx"
+                placeholder="Document Title (e.g. Product Specs 2026)"
                 value={docTitle}
                 onChange={(e) => setDocTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Raw Text / Whitepaper Excerpt</label>
               <textarea
-                rows={4}
-                placeholder="Paste company specific text, whitepapers, or disclaimers here..."
+                rows={3}
+                placeholder="Paste raw guidelines or whitepaper text directly..."
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <button
               type="submit"
-              disabled={uploading}
-              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all"
+              disabled={uploading || (stagedFiles.length === 0 && !manualText)}
+              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
-              <span>{uploading ? 'Processing & Vector Chunking...' : 'Ingest Document & Vectorize'}</span>
+              <span>{uploading ? 'Extracting & Ingesting Chunks...' : 'Ingest to Vector Index'}</span>
             </button>
           </form>
         </div>
@@ -156,25 +172,28 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
         {/* Uploaded Documents & Chunks Inspector */}
         <div className="lg:col-span-2 space-y-6">
           {/* Documents List */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Database className="w-4 h-4 text-purple-500" /> Ingested Brand Knowledge Documents
-            </h2>
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Database className="w-4 h-4 text-indigo-500" /> Ingested Brand Knowledge Sources
+              </h2>
+              <span className="text-[11px] text-slate-500 font-medium">Tenant Scoped</span>
+            </div>
 
             {docs.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-xs">No documents uploaded yet.</div>
+              <div className="text-center py-8 text-slate-400 text-xs">No documents uploaded yet. Upload a PDF or TXT file above.</div>
             ) : (
               <div className="space-y-3">
                 {docs.map((doc: any) => (
-                  <div key={doc.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div key={doc.id} className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold uppercase text-[10px]">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold uppercase text-[10px] shrink-0">
                         {doc.fileType || 'doc'}
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white">{doc.filename}</h4>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                          Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()} • {doc.charCount.toLocaleString()} chars • {doc.chunkCount} RAG vector chunks
+                          Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()} • {doc.charCount.toLocaleString()} chars • {doc.chunkCount} RAG chunks • Trust: VERIFIED_INTERNAL
                         </span>
                       </div>
                     </div>
@@ -188,16 +207,16 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
           </div>
 
           {/* RAG Chunk Inspector */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-500" /> Vector Knowledge Chunks ({filteredChunks.length})
+                <Layers className="w-4 h-4 text-indigo-500" /> Vector Knowledge Excerpts ({filteredChunks.length})
               </h2>
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Search chunk contents..."
+                  placeholder="Search excerpts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
@@ -210,7 +229,7 @@ export default function BrandKnowledgePage({ params }: { params: { id: string } 
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {filteredChunks.map((chunk: any) => (
-                  <div key={chunk.id} className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+                  <div key={chunk.id} className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1 text-xs">
                     <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
                       <span>Chunk #{chunk.chunkIndex + 1}</span>
                       <span>{chunk.charCount} characters</span>

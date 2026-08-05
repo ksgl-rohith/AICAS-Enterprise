@@ -11,6 +11,8 @@ describe('Normalized Analytics Model & Ingestion Engine', () => {
       platform: 'linkedin',
       eventType: 'snapshot',
       occurredAt: new Date().toISOString(),
+      source: 'api',
+      schemaVersion: '1.0',
       metrics: {
         impressions: 5000,
         reach: 4200,
@@ -48,6 +50,8 @@ describe('Normalized Analytics Model & Ingestion Engine', () => {
       platform: 'linkedin',
       eventType: 'snapshot',
       occurredAt: timestamp,
+      source: 'api',
+      schemaVersion: '1.0',
       metrics: {
         impressions: 1000,
         reach: 800,
@@ -84,6 +88,8 @@ describe('Normalized Analytics Model & Ingestion Engine', () => {
       platform: 'facebook',
       eventType: 'correction',
       occurredAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      source: 'api',
+      schemaVersion: '1.0',
       metrics: {
         impressions: 12000,
         reach: 10000,

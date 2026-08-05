@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FlaskConical, Play, ShieldAlert, CheckCircle2, TrendingUp, HelpCircle } from 'lucide-react';
+import { FlaskConical, Play, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Badge } from '@/components/ui/badge';
 
 export default function ExperimentsPage() {
   const [hypothesis, setHypothesis] = useState('Technical carousel posts generate 3x higher CTR than text posts.');
@@ -32,42 +34,43 @@ export default function ExperimentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <FlaskConical className="w-5 h-5 text-indigo-400" /> Experiment Management & Evaluation
-          </h1>
-          <p className="text-xs text-slate-400">
-            Controlled A/B testing, holdout groups, and deterministic statistical evaluation engine.
-          </p>
-        </div>
-
-        <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-          Statistical Engine Active
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="Intelligence & Growth"
+        title="Experiment Management & Evaluation"
+        description="Controlled A/B testing, holdout groups, and deterministic statistical evaluation engine."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Intelligence & Growth' },
+          { label: 'Experiments & A/B' },
+        ]}
+        actions={
+          <Badge variant="indigo" icon={<FlaskConical className="w-3.5 h-3.5" />}>
+            Statistical Engine Active
+          </Badge>
+        }
+      />
 
       {/* Experiment Design & Run Card */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white">Create & Evaluate Controlled Experiment</h2>
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white">Create & Evaluate Controlled Experiment</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="space-y-1">
-            <label className="text-slate-400 font-semibold block">Optimization Hypothesis</label>
+            <label className="text-slate-700 dark:text-slate-300 font-semibold block">Optimization Hypothesis</label>
             <input
               type="text"
               value={hypothesis}
               onChange={(e) => setHypothesis(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-slate-400 font-semibold block">Primary Optimization Metric</label>
+            <label className="text-slate-700 dark:text-slate-300 font-semibold block">Primary Optimization Metric</label>
             <select
               value={metric}
               onChange={(e) => setMetric(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
             >
               <option value="ctr">Click-Through Rate (CTR)</option>
               <option value="conversionRate">Conversion Rate</option>
@@ -77,16 +80,16 @@ export default function ExperimentsPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <ShieldAlert className="w-4 h-4 text-emerald-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>High-risk content automatically excluded from autonomous testing.</span>
           </div>
 
           <button
             onClick={handleRunEvaluation}
             disabled={evaluating}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2 shadow-sm shadow-indigo-600/30 transition-all"
           >
             <Play className="w-3.5 h-3.5" />
             <span>{evaluating ? 'Evaluating Statistics...' : 'Evaluate Controlled Test'}</span>
@@ -96,34 +99,34 @@ export default function ExperimentsPage() {
 
       {/* Test Results Output */}
       {evalResult && (
-        <div className="p-6 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Statistical Significance Evaluation
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Statistical Significance Evaluation
             </h2>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+            <Badge variant="emerald">
               Confidence: {(evalResult.confidenceLevel * 100).toFixed(1)}%
-            </span>
+            </Badge>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-              <span className="text-slate-500 font-semibold block uppercase text-[10px]">Control (Variant A)</span>
-              <span className="text-white font-bold block text-sm">{(evalResult.controlRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold block uppercase text-[10px]">Control (Variant A)</span>
+              <span className="text-slate-900 dark:text-white font-bold block text-sm">{(evalResult.controlRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-              <span className="text-slate-500 font-semibold block uppercase text-[10px]">Treatment (Variant B)</span>
-              <span className="text-purple-400 font-bold block text-sm">{(evalResult.treatmentRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold block uppercase text-[10px]">Treatment (Variant B)</span>
+              <span className="text-purple-600 dark:text-purple-400 font-bold block text-sm">{(evalResult.treatmentRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-              <span className="text-slate-500 font-semibold block uppercase text-[10px]">Relative Lift</span>
-              <span className="text-emerald-400 font-bold block text-sm">+{(evalResult.relativeLift * 100).toFixed(1)}%</span>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold block uppercase text-[10px]">Relative Lift</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold block text-sm">+{(evalResult.relativeLift * 100).toFixed(1)}%</span>
             </div>
           </div>
 
-          <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed">
+          <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 leading-relaxed">
             {evalResult.explanation}
           </p>
         </div>

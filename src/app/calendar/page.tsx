@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Clock, Play, Plus, Radio, CheckCircle2, AlertCircle, RefreshCw, Send, ExternalLink } from 'lucide-react';
+import { CalendarDays, Plus, RefreshCw, Send, ExternalLink } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Badge } from '@/components/ui/badge';
 
 export default function CalendarPage() {
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -110,55 +113,62 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Calendar & Schedule Orchestration</h1>
-          <p className="text-xs text-slate-400">
-            Cadence and timezone-aware publishing schedule. Dispatch through live API connectors or simulated sandbox.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Publishing Operations"
+        title="Calendar & Schedule Orchestration"
+        description="Cadence and timezone-aware publishing schedule. Dispatch through live API connectors or simulated sandbox."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Campaign Operations' },
+          { label: 'Calendar & Schedule' },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTriggerDue}
+              disabled={triggeringDue}
+              className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${triggeringDue ? 'animate-spin' : ''}`} />
+              <span>Process Scheduled Posts</span>
+            </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleTriggerDue}
-            disabled={triggeringDue}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${triggeringDue ? 'animate-spin' : ''}`} />
-            <span>Process Scheduled Posts</span>
-          </button>
-
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Schedule Approved Post</span>
-          </button>
-        </div>
-      </div>
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/30 flex items-center gap-2 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Schedule Approved Post</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* Schedule Items Agenda Feed */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-indigo-400" /> Scheduled Publishing Queue ({schedules.length})
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Scheduled Publishing Queue ({schedules.length})
           </h2>
-          <span className="text-xs text-slate-400 font-mono">Timezone: UTC</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Timezone: UTC</span>
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-slate-500 text-xs">Loading scheduled publications...</div>
+          <div className="text-center py-12 text-slate-500 text-xs">Loading scheduled publications...</div>
         ) : schedules.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-xs space-y-2">
-            <p>No posts currently scheduled.</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold inline-flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Schedule Approved Content
-            </button>
-          </div>
+          <EmptyState
+            icon={CalendarDays}
+            title="No Posts Scheduled"
+            description="There are currently no content posts scheduled in the queue."
+            action={
+              <button
+                onClick={() => setShowModal(true)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-sm shadow-indigo-600/30"
+              >
+                <Plus className="w-4 h-4" /> Schedule Approved Content
+              </button>
+            }
+          />
         ) : (
           <div className="space-y-3">
             {schedules.map((s) => {
@@ -166,29 +176,21 @@ export default function CalendarPage() {
               return (
                 <div
                   key={s.id}
-                  className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                  className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        {s.channel}
-                      </span>
-                      <h4 className="font-bold text-white">{s.contentItem?.title}</h4>
+                      <Badge variant="indigo">{s.channel}</Badge>
+                      <h4 className="font-bold text-slate-900 dark:text-white">{s.contentItem?.title}</h4>
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Scheduled Slot: <strong className="text-slate-200">{new Date(s.scheduledTime).toLocaleString()}</strong> • Campaign:{' '}
-                      <strong className="text-purple-400">{s.campaign?.name}</strong>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Scheduled Slot: <strong className="text-slate-800 dark:text-slate-200">{new Date(s.scheduledTime).toLocaleString()}</strong> • Campaign:{' '}
+                      <strong className="text-purple-600 dark:text-purple-400">{s.campaign?.name}</strong>
                     </p>
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        isPublished ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                      }`}
-                    >
-                      {s.status}
-                    </span>
+                    <Badge variant={isPublished ? 'emerald' : 'amber'}>{s.status}</Badge>
 
                     {isPublished ? (
                       s.publications?.[0]?.permalink && (
@@ -196,7 +198,7 @@ export default function CalendarPage() {
                           href={s.publications[0].permalink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-all"
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-300 font-semibold text-xs flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                           <span>View Post</span>
@@ -206,7 +208,7 @@ export default function CalendarPage() {
                       <button
                         onClick={() => handlePublishNow(s.contentItemId, s.channel, s.id)}
                         disabled={publishing[s.contentItemId]}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 transition-all"
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>{publishing[s.contentItemId] ? 'Publishing...' : 'Publish Now'}</span>
@@ -222,18 +224,18 @@ export default function CalendarPage() {
 
       {/* Schedule Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-            <h3 className="text-base font-bold text-white">Schedule Approved Post</h3>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Schedule Approved Post</h3>
 
             <form onSubmit={handleCreateSchedule} className="space-y-4 text-xs">
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">Select Approved Content Item *</label>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Select Approved Content Item *</label>
                 <select
                   required
                   value={selectedItemId}
                   onChange={(e) => setSelectedItemId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
                 >
                   <option value="">-- Choose Item --</option>
                   {approvedItems.map((item) => (
@@ -245,11 +247,11 @@ export default function CalendarPage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">Target Social Channel</label>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Target Social Channel</label>
                 <select
                   value={selectedChannel}
                   onChange={(e) => setSelectedChannel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white uppercase"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white uppercase"
                 >
                   <option value="linkedin">LinkedIn</option>
                   <option value="facebook">Facebook Page</option>
@@ -259,13 +261,13 @@ export default function CalendarPage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">Date & Time (UTC)</label>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Date & Time (UTC)</label>
                 <input
                   type="datetime-local"
                   required
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -273,11 +275,11 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                 >
                   Cancel
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-semibold shadow-md">
+                <button type="submit" className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-600/30">
                   Confirm Schedule
                 </button>
               </div>

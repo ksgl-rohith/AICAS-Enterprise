@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Globe, Languages, ShieldCheck, GitCommit } from 'lucide-react';
+import { Globe, Languages } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Badge } from '@/components/ui/badge';
 
 export default function LocalizationPage() {
   const [items] = useState([
@@ -31,44 +33,44 @@ export default function LocalizationPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-          <Globe className="w-5 h-5 text-indigo-400" /> Localization & Transcreation Management
-        </h1>
-        <p className="text-xs text-slate-400">
-          Source-to-localized content lineage, transcreation adaptation, locale policy validation, and disclaimer preservation.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Content Operations"
+        title="Localization & Transcreation Management"
+        description="Source-to-localized content lineage, transcreation adaptation, locale policy validation, and disclaimer preservation."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Content Operations' },
+          { label: 'Localization' },
+        ]}
+      />
 
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">
-          <Languages className="w-4 h-4 text-indigo-400" /> Localized Content Lineage & Adaptations
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <Languages className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Localized Content Lineage & Adaptations
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           {items.map((item) => (
-            <div key={item.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div key={item.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-white uppercase">{item.targetLocale}</span>
-                  <span className="text-[10px] text-slate-400">From {item.sourceLocale}</span>
+                  <span className="font-bold text-slate-900 dark:text-white uppercase">{item.targetLocale}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">From {item.sourceLocale}</span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  {item.policyValidationStatus}
-                </span>
+                <Badge variant="emerald">{item.policyValidationStatus}</Badge>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Localized Body</span>
-                <p className="text-slate-200">{item.translatedBody}</p>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Localized Body</span>
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{item.translatedBody}</p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Localized CTA</span>
-                <p className="text-indigo-300 font-bold">{item.translatedCTA}</p>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Localized CTA</span>
+                <p className="text-indigo-600 dark:text-indigo-400 font-bold">{item.translatedCTA}</p>
               </div>
 
-              <div className="p-2.5 rounded bg-slate-900 text-slate-400 text-[11px]">
+              <div className="p-2.5 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-[11px] border border-slate-200 dark:border-slate-800">
                 <strong>Transcreation Note:</strong> {item.transcreationNotes}
               </div>
             </div>

@@ -2,9 +2,32 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Building2, Save, Sparkles, Globe, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  Building2,
+  Save,
+  Sparkles,
+  Globe,
+  Loader2,
+  CheckCircle2,
+  ArrowRight,
+  FileText,
+  ShieldCheck,
+  Zap,
+  Sliders,
+  FileCheck,
+} from 'lucide-react';
+import {
+  BrandDocumentUploader,
+  UploadedFileItem,
+} from '@/components/ui/brand-document-uploader';
 
 export default function NewBrandPage() {
+  const router = useRouter();
+
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+
   const [formData, setFormData] = useState({
     name: '',
     industry: 'Enterprise Software & AI',
@@ -22,17 +45,20 @@ export default function NewBrandPage() {
   });
 
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [ingesting, setIngesting] = useState(false);
-  const [ingestSuccess, setIngestSuccess] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [ingestingUrl, setIngestingUrl] = useState(false);
+  const [ingestUrlSuccess, setIngestUrlSuccess] = useState(false);
+
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileItem[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionProgress, setSubmissionProgress] = useState('');
 
   const handleWebsiteIngestion = async () => {
     if (!websiteUrl) {
       alert('Please enter a valid website URL or domain name.');
       return;
     }
-    setIngesting(true);
-    setIngestSuccess(false);
+    setIngestingUrl(true);
+    setIngestUrlSuccess(false);
 
     try {
       const res = await fetch('/api/brands/ingest-url', {
@@ -44,273 +70,515 @@ export default function NewBrandPage() {
       const resData = await res.json();
       if (res.ok && resData.extractedData) {
         const ext = resData.extractedData;
-        const newBrandData = {
-          name: ext.name || formData.name,
-          industry: ext.industry || formData.industry,
-          description: ext.description || formData.description,
-          products: ext.products || formData.products,
-          targetAudience: ext.targetAudience || formData.targetAudience,
-          personality: ext.personality || formData.personality,
-          tone: ext.tone || formData.tone,
-          preferredVocabulary: ext.preferredVocabulary || formData.preferredVocabulary,
-          prohibitedPhrases: ext.prohibitedPhrases || formData.prohibitedPhrases,
-          requiredDisclaimers: ext.requiredDisclaimers || formData.requiredDisclaimers,
-          defaultCTA: ext.defaultCTA || formData.defaultCTA,
-          region: 'Global',
-          language: 'en-US',
-        };
+        setFormData((prev) => ({
+          ...prev,
+          name: ext.name || prev.name,
+          industry: ext.industry || prev.industry,
+          description: ext.description || prev.description,
+          products: ext.products || prev.products,
+          targetAudience: ext.targetAudience || prev.targetAudience,
+          personality: ext.personality || prev.personality,
+          tone: ext.tone || prev.tone,
+          preferredVocabulary: ext.preferredVocabulary || prev.preferredVocabulary,
+          prohibitedPhrases: ext.prohibitedPhrases || prev.prohibitedPhrases,
+          requiredDisclaimers: ext.requiredDisclaimers || prev.requiredDisclaimers,
+          defaultCTA: ext.defaultCTA || prev.defaultCTA,
+        }));
 
-        setFormData(newBrandData);
-
-        // Automatically save brand to DB
-        await fetch('/api/brands', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newBrandData),
-        });
-
-        setIngestSuccess(true);
+        setIngestUrlSuccess(true);
       } else {
         alert('URL extraction completed with standard company metadata.');
       }
     } catch {
       alert('Website extraction error.');
     } finally {
-      setIngesting(false);
+      setIngestingUrl(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const handleFinalSubmit = async () => {
+    if (!formData.name) {
+      alert('Brand Name is required.');
+      setCurrentStep(1);
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmissionProgress('Creating Brand DNA Profile in database...');
 
     try {
-      const res = await fetch('/api/brands', {
+      // Step A: Create Brand Record
+      const brandRes = await fetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
-      if (res.ok) {
-        window.location.href = '/brands';
-      } else {
-        alert('Failed to create brand.');
-        setSaving(false);
+      if (!brandRes.ok) {
+        throw new Error('Failed to create brand record.');
       }
-    } catch {
-      alert('Error creating brand profile.');
-      setSaving(false);
+
+      const brand = await brandRes.json();
+
+      // Step B: Upload & Ingest Knowledge Documents for this Brand
+      if (uploadedFiles.length > 0) {
+        setSubmissionProgress(`Ingesting ${uploadedFiles.length} knowledge documents into RAG vector index...`);
+
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const item = uploadedFiles[i];
+          const uploadData = new FormData();
+          uploadData.append('file', item.file);
+          uploadData.append('title', item.title || item.name);
+
+          try {
+            await fetch(`/api/brands/${brand.id}/knowledge`, {
+              method: 'POST',
+              body: uploadData,
+            });
+          } catch {
+            console.error(`Failed to ingest document ${item.name}`);
+          }
+        }
+      }
+
+      setSubmissionProgress('Brand DNA Profile created successfully!');
+      setTimeout(() => {
+        router.push(`/brands/${brand.id}`);
+      }, 800);
+    } catch (err: any) {
+      alert(err.message || 'Error creating Brand Profile.');
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Top Header */}
       <div className="flex items-center gap-3">
-        <Link href="/brands" className="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all">
+        <Link
+          href="/brands"
+          className="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all"
+        >
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Create Brand DNA Profile</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Configure corporate identity, website extraction, tone rules, and disclaimers.</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            Create Brand DNA Profile
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Define corporate identity, voice rules, RAG knowledge documents, and disclaimers.
+          </p>
         </div>
       </div>
 
-      {/* Website & Source Ingestion Agent Panel */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 border border-indigo-500/30 text-white space-y-4 shadow-xl relative overflow-hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">AI Website URL Ingestion Agent</h2>
-          </div>
-          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-            IngestionAgent Active
-          </span>
-        </div>
-
-        <p className="text-xs text-slate-300 leading-relaxed">
-          Paste your company website URL below. The <strong>Ingestion Agent</strong> will parse website content and automatically extract and populate all brand fields (Industry, Products, Audience, Tone, Vocabulary, Disclaimers, CTA).
-        </p>
-
-        <div className="flex items-center gap-3">
-          <input
-            type="url"
-            placeholder="e.g. https://apexai.solutions or https://stripe.com or https://company.com"
-            value={websiteUrl}
-            onChange={(e) => setWebsiteUrl(e.target.value)}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950/80 border border-indigo-500/40 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-          />
-          <button
-            type="button"
-            onClick={handleWebsiteIngestion}
-            disabled={ingesting}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all shrink-0"
-          >
-            {ingesting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Extracting Website DNA...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>Extract Website DNA</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {ingestSuccess && (
-          <div className="p-3.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Successfully extracted and saved brand DNA to database!</span>
-            </div>
-            <Link
-              href="/brands"
-              className="px-3 py-1 rounded-xl bg-emerald-500 text-slate-950 font-bold text-[11px] flex items-center gap-1 hover:bg-emerald-400 shrink-0"
+      {/* 4-Step Wizard Stepper Bar */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { step: 1, title: 'Identity', desc: 'Name & Industry' },
+            { step: 2, title: 'Voice & Rules', desc: 'Tone & Disclaimers' },
+            { step: 3, title: 'Knowledge', desc: 'Document Upload' },
+            { step: 4, title: 'Review & Create', desc: 'Grounding Verification' },
+          ].map((s) => (
+            <button
+              key={s.step}
+              type="button"
+              onClick={() => setCurrentStep(s.step as any)}
+              className={`p-2.5 rounded-xl text-left border transition-all ${
+                currentStep === s.step
+                  ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-bold'
+                  : currentStep > s.step
+                  ? 'border-emerald-500/40 bg-emerald-50/20 dark:bg-emerald-950/20'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50'
+              }`}
             >
-              <span>View in Brands List</span> <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        )}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block leading-tight">
+                Step 0{s.step}
+              </span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-white block truncate">
+                {s.title}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-6 shadow-xl">
-        <div className="space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-indigo-500" /> Brand Profile Details (Auto-Filled)
-          </h2>
+      {/* STEP 1: BRAND IDENTITY */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          {/* Website URL Extractor Card */}
+          <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-4 shadow-xl border border-slate-800 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  AI Website Extraction Agent
+                </h2>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                IngestionAgent
+              </span>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Brand Name *</label>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Enter your corporate website URL below. The <strong>Ingestion Agent</strong> will parse website metadata and populate Brand DNA fields automatically.
+            </p>
+
+            <div className="flex items-center gap-3">
               <input
-                type="text"
-                required
-                placeholder="e.g. ApexAI Solutions"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                type="url"
+                placeholder="e.g. https://apexai.solutions or https://stripe.com"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                type="button"
+                onClick={handleWebsiteIngestion}
+                disabled={ingestingUrl}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-indigo-600/30 transition-all shrink-0"
+              >
+                {ingestingUrl ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Extracting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Extract Website DNA</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {ingestUrlSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Website DNA extracted successfully into brand fields!</span>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-indigo-500" /> Basic Brand Information
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Brand Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. ApexAI Solutions"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Industry & Domain
+                </label>
+                <input
+                  type="text"
+                  value={formData.industry}
+                  onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                Company & Brand Overview
+              </label>
+              <textarea
+                rows={3}
+                placeholder="What does your company do? What value do you deliver?"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Industry</label>
-              <input
-                type="text"
-                value={formData.industry}
-                onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Core Products / Offerings
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Apex Workflow Engine, Apex Studio"
+                  value={formData.products}
+                  onChange={(e) => setFormData({ ...formData, products: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Target Audience Persona
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. CTOs, VPs of Marketing, Enterprise IT Leads"
+                  value={formData.targetAudience}
+                  onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Company & Brand Description</label>
-            <textarea
-              rows={3}
-              placeholder="What does your company do? What value do you deliver?"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Products / Services</label>
-              <input
-                type="text"
-                placeholder="e.g. Apex Workflow Engine, Apex Studio"
-                value={formData.products}
-                onChange={(e) => setFormData({ ...formData, products: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Target Audience</label>
-              <input
-                type="text"
-                placeholder="e.g. CTOs, VPs of Marketing, Enterprise IT Leaders"
-                value={formData.targetAudience}
-                onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!formData.name) {
+                  alert('Please enter a Brand Name.');
+                  return;
+                }
+                setCurrentStep(2);
+              }}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all"
+            >
+              <span>Continue to Voice & Governance &rarr;</span>
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" /> Voice & Governance Controls
-          </h2>
+      {/* STEP 2: VOICE & GOVERNANCE */}
+      {currentStep === 2 && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" /> Voice & Governance Rules
+            </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Brand Personality & Tone
+                </label>
+                <input
+                  type="text"
+                  value={formData.tone}
+                  onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Default Call-to-Action (CTA)
+                </label>
+                <input
+                  type="text"
+                  value={formData.defaultCTA}
+                  onChange={(e) => setFormData({ ...formData, defaultCTA: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Brand Personality & Tone</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                Preferred Vocabulary (Comma Separated)
+              </label>
               <input
                 type="text"
-                value={formData.tone}
-                onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
+                value={formData.preferredVocabulary}
+                onChange={(e) => setFormData({ ...formData, preferredVocabulary: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
+
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Default CTA</label>
+              <label className="text-xs font-semibold text-amber-600 dark:text-amber-400 block mb-1">
+                Prohibited Phrases (Triggers Compliance Blocking)
+              </label>
               <input
                 type="text"
-                value={formData.defaultCTA}
-                onChange={(e) => setFormData({ ...formData, defaultCTA: e.target.value })}
+                value={formData.prohibitedPhrases}
+                onChange={(e) => setFormData({ ...formData, prohibitedPhrases: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-amber-500/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                Mandatory Legal Disclaimers
+              </label>
+              <textarea
+                rows={2}
+                value={formData.requiredDisclaimers}
+                onChange={(e) => setFormData({ ...formData, requiredDisclaimers: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Preferred Vocabulary (Comma Separated)</label>
-            <input
-              type="text"
-              value={formData.preferredVocabulary}
-              onChange={(e) => setFormData({ ...formData, preferredVocabulary: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-amber-600 dark:text-amber-400 block mb-1">Prohibited Phrases (Comma Separated)</label>
-            <input
-              type="text"
-              placeholder="Terms that trigger deterministic review blockage"
-              value={formData.prohibitedPhrases}
-              onChange={(e) => setFormData({ ...formData, prohibitedPhrases: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-amber-500/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Required Legal Disclaimers</label>
-            <textarea
-              rows={2}
-              value={formData.requiredDisclaimers}
-              onChange={(e) => setFormData({ ...formData, requiredDisclaimers: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-            />
+          <div className="flex justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+            >
+              &larr; Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(3)}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all"
+            >
+              <span>Continue to Knowledge Documents &rarr;</span>
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
-          <Link href="/brands" className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
-          >
-            <Save className="w-4 h-4" />
-            <span>{saving ? 'Saving...' : 'Save Brand Profile'}</span>
-          </button>
+      {/* STEP 3: KNOWLEDGE DOCUMENTS UPLOAD */}
+      {currentStep === 3 && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-500" /> RAG Knowledge Document Upload
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Upload corporate whitepapers, product documentation, tone guides, or PDF collateral. AI agents retrieve excerpts from these files to ground generated social campaigns in verified brand facts.
+            </p>
+
+            <BrandDocumentUploader
+              files={uploadedFiles}
+              onChange={setUploadedFiles}
+            />
+          </div>
+
+          <div className="flex justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(2)}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+            >
+              &larr; Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(4)}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all"
+            >
+              <span>Review & Create Brand DNA &rarr;</span>
+            </button>
+          </div>
         </div>
-      </form>
+      )}
+
+      {/* STEP 4: REVIEW & CREATE */}
+      {currentStep === 4 && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-6 shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Review Brand DNA Summary
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Brand Name</span>
+                <span className="font-bold text-slate-900 dark:text-white">{formData.name || 'N/A'}</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Industry</span>
+                <span className="font-bold text-slate-900 dark:text-white">{formData.industry}</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1 md:col-span-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Personality & Tone</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{formData.tone}</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1 md:col-span-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Prohibited Phrases</span>
+                <span className="font-mono text-amber-600 dark:text-amber-400">{formData.prohibitedPhrases}</span>
+              </div>
+            </div>
+
+            {/* Knowledge Documents Summary */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                Ingested Knowledge Sources ({uploadedFiles.length})
+              </span>
+              {uploadedFiles.length === 0 ? (
+                <div className="text-xs text-slate-400 italic">No documents uploaded. Standard brand DNA rules will apply.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between"
+                    >
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{file.title || file.name}</span>
+                      <span className="text-[10px] font-bold text-indigo-500 uppercase">RAG Grounded</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Prompt Injection Safeguard Banner */}
+            <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <span className="font-bold text-slate-900 dark:text-white block">
+                  Prompt-Injection & Security Isolation Active
+                </span>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Uploaded documents are automatically wrapped in <code>&lt;untrusted_retrieved_document&gt;</code> tags. AI agents treat retrieved excerpts purely as source evidence and will ignore embedded instructions.
+                </p>
+              </div>
+            </div>
+
+            {submissionProgress && (
+              <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs flex items-center gap-2 font-medium">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>{submissionProgress}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(3)}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+            >
+              &larr; Back
+            </button>
+            <button
+              type="button"
+              onClick={handleFinalSubmit}
+              disabled={submitting}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Processing Ingestion...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Create Brand Profile & Ingest</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
