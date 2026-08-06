@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/components/auth-context';
+import { AppShell } from '@/components/layout/app-shell';
 
 export const metadata: Metadata = {
-  title: 'AICAS Enterprise - Autonomous Multi-Agent Content OS',
+  title: 'AICAS Enterprise - Autonomous Multi-Agent Content Intelligence & Publishing Platform',
   description:
-    'Enterprise multi-agent social media content intelligence, generation, review, visual preview, publishing, and analytics platform.',
+    'Enterprise multi-agent social media content intelligence, generation, deterministic review council, visual studio, automated scheduling, social API connectors, and normalized analytics platform.',
 };
 
 export default function RootLayout({
@@ -17,17 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen bg-canvas text-tprimary selection:bg-indigo-500 selection:text-white transition-colors duration-200">
+    <html lang="en" suppressHydrationWarning className="light">
+      <body className="flex flex-col min-h-screen bg-white text-slate-900 selection:bg-indigo-500 selection:text-white transition-colors duration-200 antialiased">
         <AuthProvider>
           <ThemeProvider>
-            <div className="flex flex-1 relative">
-              <Sidebar />
-              <div className="flex-1 flex flex-col min-w-0">
-                <Header />
-                <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
-              </div>
-            </div>
+            <AppShell>{children}</AppShell>
           </ThemeProvider>
         </AuthProvider>
       </body>
