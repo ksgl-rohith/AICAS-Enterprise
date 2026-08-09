@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { useTheme } from '@/components/theme-provider';
+import { usePreferences } from '@/components/preferences-provider';
 
 export default function AdminPreferencesPage() {
   const { theme, toggleTheme } = useTheme();
@@ -145,12 +146,16 @@ export default function AdminPreferencesPage() {
     setShowRealProviderConfirm(false);
   };
 
+  const { updatePreferences } = usePreferences();
+
   const handleSave = async () => {
     setSaving(true);
     setErrorMessage('');
     setSavedSuccess(false);
 
     try {
+      await updatePreferences(formData);
+
       const res = await fetch('/api/settings/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

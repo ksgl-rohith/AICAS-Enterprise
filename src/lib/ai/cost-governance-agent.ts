@@ -73,7 +73,8 @@ export class CostGovernanceAgent {
     const isBudgetAvailable = remainingBudget >= (isMedia ? mediaCost : 0.01);
     const approved = isBudgetAvailable && (!requiresMediaApproval || !isMedia);
 
-    const estimatedCost = isMedia ? mediaCost : modelGateway.calculateTokenCost(modelName, 1000);
+    const tokenCostObj = modelGateway.calculateTokenCost(modelName, 1000);
+    const estimatedCost = isMedia ? mediaCost : (typeof tokenCostObj === 'number' ? tokenCostObj : tokenCostObj.cost);
 
     const explanation = !isBudgetAvailable
       ? `Budget exceeded for tenant ${tenantId}. Remaining monthly budget: $${remainingBudget.toFixed(2)}, required: $${estimatedCost.toFixed(2)}.`

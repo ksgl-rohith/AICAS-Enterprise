@@ -72,14 +72,14 @@ export function WhyEnterprisesSection() {
         </p>
       </div>
 
-      {/* Enterprise Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Enterprise Cards Centered Flex Wrapper */}
+      <div className="flex flex-wrap justify-center gap-6 max-w-6xl mx-auto">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className="p-8 rounded-3xl bg-white border border-slate-200 hover:border-indigo-400 transition-all shadow-sm hover:shadow-md space-y-4 group"
+              className="p-8 rounded-3xl bg-white border border-slate-200 hover:border-indigo-400 transition-all shadow-sm hover:shadow-md space-y-4 group w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] max-w-sm flex-grow-0 shrink-0"
             >
               <div className="flex items-center justify-between">
                 <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${card.color} group-hover:scale-110 transition-transform`}>

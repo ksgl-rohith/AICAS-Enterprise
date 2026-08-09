@@ -363,18 +363,23 @@ model AgentRun {
 }
 
 model AuditEvent {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  brandId     String?
-  brand       Brand?   @relation(fields: [brandId], references: [id])
-  campaignId  String?
-  campaign    Campaign? @relation(fields: [campaignId], references: [id])
-  action      String   // e.g., 'BRAND_CREATED', 'DOCUMENT_UPLOADED', 'STRATEGY_GENERATED', 'CONTENT_GENERATED', 'REVIEW_PASSED', 'APPROVED', 'PUBLISHED_SIMULATED', 'PUBLISHED_LIVE'
-  details     String
-  entityType  String
-  entityId    String
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  tenantId      String   @default("tenant-default")
+  category      String   @default("System") // 'Authentication', 'Administration', 'Brand', 'Knowledge / RAG', 'Campaign', 'Agent Execution', 'AI / Model', 'Approval', 'Compliance', 'Content', 'Scheduling', 'Publishing', 'Connector', 'Analytics', 'Forecasting', 'Experiment', 'Optimization', 'Cost', 'Credential', 'Security', 'Incident', 'System'
+  severity      String   @default("info")   // 'info', 'warning', 'critical'
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  brandId       String?
+  brand         Brand?   @relation(fields: [brandId], references: [id])
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id])
+  action        String   // e.g., 'BRAND_CREATED', 'DOCUMENT_UPLOADED', 'STRATEGY_GENERATED', 'CONTENT_GENERATED', 'REVIEW_PASSED', 'APPROVED', 'PUBLISHED_SIMULATED', 'PUBLISHED_LIVE'
+  details       String
+  entityType    String
+  entityId      String
+  correlationId String?
+  metadataJson  String?
+  createdAt     DateTime @default(now())
 }
 
 model PlatformConnection {
@@ -601,6 +606,9 @@ model CostUsageRecord {
   campaignId       String?
   agentName        String
   modelName        String
+  billingClass     String   @default("FREE") // 'FREE', 'PAID'
+  billingSubtype   String   @default("mock_engine") // 'local_model', 'free_api_tier', 'promotional_credit', 'enterprise_included', 'token_billed', 'request_billed', 'media_billed'
+  routingReason    String?
   tier             String   @default("STANDARD") // 'ECONOMY', 'STANDARD', 'PREMIUM'
   inputTokens      Int
   outputTokens     Int
@@ -608,6 +616,54 @@ model CostUsageRecord {
   actualCostUsd    Float
   isAnomaly        Boolean  @default(false)
   createdAt        DateTime @default(now())
+}
+
+model ApiCredential {
+  id               String    @id @default(cuid())
+  tenantId         String    @default("tenant-default")
+  category         String    // 'ai', 'social', 'search', 'media', 'other'
+  provider         String    // 'gemini', 'openai', 'anthropic', 'linkedin', 'telegram', 'serpapi', etc.
+  name             String
+  encryptedSecret  String    // JSON string containing AES-256-GCM encrypted payload
+  keyMask          String    // e.g. "sk-•••••••••7X2A"
+  configJson       String?   // Additional non-secret metadata
+  status           String    @default("configured") // 'not_configured', 'configured', 'testing', 'connected', 'degraded', 'token_expiring', 'expired', 'permission_required', 'failed'
+  lastTestedAt     DateTime?
+  lastSuccessAt    DateTime?
+  lastError        String?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, category, provider])
+}
+
+model PerformanceForecast {
+  id                String    @id @default(cuid())
+  tenantId          String    @default("tenant-default")
+  brandId           String
+  campaignId        String?
+  contentItemId     String?
+  publicationId     String?
+  channel           String
+  metric            String    // 'impressions', 'reach', 'engagements', 'ctr', etc.
+  predictedValue    Float
+  lowerBound        Float
+  upperBound        Float
+  confidence        String    // 'High', 'Medium', 'Low'
+  dataSufficiency   String    // 'Sufficient', 'Sparse', 'ColdStart'
+  baseline          Float
+  expectedLift      Float
+  modelVersion      String    @default("v1.0-forecast")
+  keyFactorsJson    String?   // JSON array of factor objects
+  actualValue       Float?
+  evaluatedAt       DateTime?
+  mae               Float?
+  rmse              Float?
+  mape              Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model CommunityMessage {

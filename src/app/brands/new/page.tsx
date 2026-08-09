@@ -11,12 +11,11 @@ import {
   Globe,
   Loader2,
   CheckCircle2,
-  ArrowRight,
   FileText,
   ShieldCheck,
-  Zap,
-  Sliders,
-  FileCheck,
+  HelpCircle,
+  X,
+  RotateCcw,
 } from 'lucide-react';
 import {
   BrandDocumentUploader,
@@ -47,6 +46,9 @@ export default function NewBrandPage() {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [ingestingUrl, setIngestingUrl] = useState(false);
   const [ingestUrlSuccess, setIngestUrlSuccess] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState<string[]>([]);
+  const [extractedIntelligence, setExtractedIntelligence] = useState<any>(null);
+  const [evidenceModalField, setEvidenceModalField] = useState<{ fieldName: string; evidence: any } | null>(null);
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +61,13 @@ export default function NewBrandPage() {
     }
     setIngestingUrl(true);
     setIngestUrlSuccess(false);
+    setExtractionProgress([
+      'Validating SSRF security bounds...',
+      'Discovering website pages: Homepage, About, Products, Resources...',
+      'Parsing metadata and HTML structure...',
+      'Classifying brand voice & compliance disclaimers...',
+      'Building structured Brand DNA...',
+    ]);
 
     try {
       const res = await fetch('/api/brands/ingest-url', {
@@ -85,12 +94,14 @@ export default function NewBrandPage() {
           defaultCTA: ext.defaultCTA || prev.defaultCTA,
         }));
 
+        setExtractedIntelligence(resData.intelligence);
         setIngestUrlSuccess(true);
+        setExtractionProgress((prev) => [...prev, '✓ Complete! Brand DNA auto-populated.']);
       } else {
-        alert('URL extraction completed with standard company metadata.');
+        alert(resData.error || 'Website extraction error.');
       }
     } catch {
-      alert('Website extraction error.');
+      alert('Network error during website extraction.');
     } finally {
       setIngestingUrl(false);
     }
@@ -212,22 +223,22 @@ export default function NewBrandPage() {
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-indigo-400" />
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  AI Website Extraction Agent
+                  AI Website Intelligence Agent
                 </h2>
               </div>
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                IngestionAgent
+                website-brand-intelligence-agent
               </span>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Enter your corporate website URL below. The <strong>Ingestion Agent</strong> will parse website metadata and populate Brand DNA fields automatically.
+              Enter your corporate website URL. The <strong>Website Brand Intelligence Agent</strong> will safely crawl permitted public pages, extract structured Brand DNA intelligence, and provide evidence confidence scores.
             </p>
 
             <div className="flex items-center gap-3">
               <input
                 type="url"
-                placeholder="e.g. https://apexai.solutions or https://stripe.com"
+                placeholder="e.g. https://stripe.com or https://apexai.solutions"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
@@ -246,16 +257,33 @@ export default function NewBrandPage() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Extract Website DNA</span>
+                    <span>Analyze Website DNA</span>
                   </>
                 )}
               </button>
             </div>
 
+            {/* Ingestion Stepper Log */}
+            {extractionProgress.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-300">
+                {extractionProgress.map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-indigo-400">&gt;</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {ingestUrlSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Website DNA extracted successfully into brand fields!</span>
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Website Brand DNA auto-populated with evidence confidence scores.</span>
+                </div>
+                <span className="text-[10px] font-mono bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/40">
+                  AI SUGGESTED
+                </span>
               </div>
             )}
           </div>
@@ -267,9 +295,20 @@ export default function NewBrandPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Brand Name *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Brand Name *
+                  </label>
+                  {extractedIntelligence?.identity?.name && (
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceModalField({ fieldName: 'Brand Name', evidence: extractedIntelligence.identity.name })}
+                      className="text-[10px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 hover:underline font-mono"
+                    >
+                      <HelpCircle className="w-3 h-3" /> Why suggested?
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   required
@@ -281,9 +320,20 @@ export default function NewBrandPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Industry & Domain
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Industry & Domain
+                  </label>
+                  {extractedIntelligence?.identity?.industry && (
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceModalField({ fieldName: 'Industry', evidence: extractedIntelligence.identity.industry })}
+                      className="text-[10px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 hover:underline font-mono"
+                    >
+                      <HelpCircle className="w-3 h-3" /> Why suggested?
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={formData.industry}
@@ -294,9 +344,20 @@ export default function NewBrandPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                Company & Brand Overview
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Company & Brand Overview
+                </label>
+                {extractedIntelligence?.identity?.description && (
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceModalField({ fieldName: 'Brand Overview', evidence: extractedIntelligence.identity.description })}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 hover:underline font-mono"
+                  >
+                    <HelpCircle className="w-3 h-3" /> Why suggested?
+                  </button>
+                )}
+              </div>
               <textarea
                 rows={3}
                 placeholder="What does your company do? What value do you deliver?"
@@ -507,28 +568,6 @@ export default function NewBrandPage() {
               </div>
             </div>
 
-            {/* Knowledge Documents Summary */}
-            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                Ingested Knowledge Sources ({uploadedFiles.length})
-              </span>
-              {uploadedFiles.length === 0 ? (
-                <div className="text-xs text-slate-400 italic">No documents uploaded. Standard brand DNA rules will apply.</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {uploadedFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between"
-                    >
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{file.title || file.name}</span>
-                      <span className="text-[10px] font-bold text-indigo-500 uppercase">RAG Grounded</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Prompt Injection Safeguard Banner */}
             <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
@@ -576,6 +615,63 @@ export default function NewBrandPage() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Modal ("Why was this suggested?") */}
+      {evidenceModalField && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-indigo-500" />
+                <span>AI Suggestion Evidence: {evidenceModalField.fieldName}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEvidenceModalField(null)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">Extracted Value</span>
+                <span className="font-bold text-slate-900 dark:text-white">{String(evidenceModalField.evidence.value)}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Confidence Score</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                    {Math.round(evidenceModalField.evidence.confidence * 100)}%
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Method</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">{evidenceModalField.evidence.extractionMethod}</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">Source Excerpt</span>
+                <p className="text-slate-600 dark:text-slate-300 italic">{evidenceModalField.evidence.evidenceExcerpt}</p>
+                <span className="text-[10px] text-indigo-500 font-mono block pt-1">{evidenceModalField.evidence.sourceUrl}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setEvidenceModalField(null)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
+              >
+                Close Evidence
+              </button>
+            </div>
           </div>
         </div>
       )}

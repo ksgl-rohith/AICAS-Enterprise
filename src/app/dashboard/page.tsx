@@ -108,12 +108,12 @@ export default function DashboardPage() {
 
         <MetricCard
           title="Total Impressions"
-          value={(analytics?.totalImpressions || 33100).toLocaleString()}
+          value={(analytics?.totalImpressions || 0).toLocaleString()}
           subtitle="Normalized cross-channel reach"
           icon={BarChart3}
           iconColor="text-emerald-500"
-          trend="+18.4%"
-          trendPositive={true}
+          trend={analytics?.totalImpressions > 0 ? '+18.4%' : 'No data yet'}
+          trendPositive={analytics?.totalImpressions > 0}
           href="/analytics"
           hrefLabel="Analytics"
           loading={loading}
