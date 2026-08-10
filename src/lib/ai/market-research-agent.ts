@@ -36,50 +36,58 @@ export class MarketResearchAgent {
     const { industry, topicOrProduct, targetAudience, channels } = task.input;
 
     const systemPrompt = `You are an AI Market Intelligence & Social Strategy Analyst.
-Your goal is to conduct market trend research, competitor analysis, and audience timing profiling for "${topicOrProduct}" in the "${industry}" sector targeting "${targetAudience}".`;
+Conduct market trend research, competitor analysis, and audience timing profiling for "${topicOrProduct}" in the "${industry}" sector targeting "${targetAudience}".
+Ensure all trends, pain points, and competitor angles are strictly specific to the ${industry} industry. Do NOT mention unrelated AI software concepts unless the industry is AI/Software.`;
 
     const userPrompt = `Industry: ${industry}
 Product/Topic: ${topicOrProduct}
 Target Audience: ${targetAudience}
 Requested Channels: ${channels.join(', ')}`;
 
+    // Build dynamic industry-specific mock fallback
+    const dynamicTrends = [
+      `Surging demand for transparent, evidence-backed ${topicOrProduct} in the ${industry} market.`,
+      `Shift toward visual micro-content and educational breakdowns for ${targetAudience}.`,
+      `Increased buyer emphasis on verifiable compliance and risk mitigation in ${industry}.`,
+    ];
+
+    const dynamicCompetitorAngles = [
+      `Competitors focus on general messaging but lack clear evidence grounding for ${topicOrProduct}.`,
+      `Opportunity to differentiate by publishing verified case studies and transparent service standards.`,
+    ];
+
+    const dynamicPainPoints = [
+      `Difficulty identifying trusted, compliant ${topicOrProduct} providers in ${industry}.`,
+      `High administrative friction and lack of clear guidance for ${targetAudience}.`,
+      `Uncertainty regarding regulatory standards and legal/compliance requirements.`,
+    ];
+
     const mockFallback: MarketResearchOutput = {
-      industryTrends: [
-        'Enterprise migration toward multi-agent AI frameworks and automated brand governance',
-        'Shift from raw automated text to rich visual carousels and infographic data stories',
-        'Increased regulatory compliance scrutiny on AI-generated corporate marketing claims',
-      ],
-      competitorStrategyAngles: [
-        'Competitors highlight speed but lack automated compliance and brand safety checks',
-        'Gaps in competitor offerings around transparent whitepaper grounding and RAG evidence',
-      ],
+      industryTrends: dynamicTrends,
+      competitorStrategyAngles: dynamicCompetitorAngles,
       highPerformingContentFormats: [
-        'LinkedIn 4-slide carousel breakdowns showing system architecture & ROI',
-        'Instagram aesthetic infographic slides highlighting 3-step compliance checklists',
-        'Facebook event card graphics promoting executive live masterclasses',
-        'Telegram instant signal alerts with bulleted key takeaways',
+        `LinkedIn 4-slide carousel breakdowns detailing ${topicOrProduct} workflows`,
+        `Instagram visual infographic slides highlighting key checklist steps for ${targetAudience}`,
+        `Facebook event card graphics for masterclass informational sessions`,
+        `Telegram instant alert summaries with bulleted takeaways`,
       ],
-      audiencePainPoints: [
-        'Fear of AI hallucinated posts harming enterprise brand reputation',
-        'High labor bottleneck in reviewing and approving multi-channel content',
-        'Difficulty scaling consistent quality across LinkedIn, Instagram, Facebook & Telegram',
-      ],
+      audiencePainPoints: dynamicPainPoints,
       optimalChannelSchedules: [
         {
           channel: 'linkedin',
           peakPostingWindow: '08:30 AM - 10:00 AM EST',
           optimalDays: ['Tuesday', 'Wednesday', 'Thursday'],
           recommendedTimeUtc: '13:30',
-          expectedEngagementMultiplier: 3.4,
-          audienceActivityRationale: 'B2B decision makers active during mid-week morning coffee hours and strategy planning windows.',
+          expectedEngagementMultiplier: 3.2,
+          audienceActivityRationale: `${targetAudience} active during morning strategy planning windows.`,
         },
         {
           channel: 'instagram',
           peakPostingWindow: '12:00 PM - 01:30 PM & 06:00 PM EST',
           optimalDays: ['Wednesday', 'Friday', 'Sunday'],
           recommendedTimeUtc: '17:00',
-          expectedEngagementMultiplier: 2.8,
-          audienceActivityRationale: 'High visual engagement during afternoon lunch breaks and evening leisure browsing.',
+          expectedEngagementMultiplier: 2.6,
+          audienceActivityRationale: `Visual engagement peaks during afternoon lunch breaks and evening browsing.`,
         },
         {
           channel: 'facebook',
@@ -87,19 +95,19 @@ Requested Channels: ${channels.join(', ')}`;
           optimalDays: ['Monday', 'Wednesday', 'Thursday'],
           recommendedTimeUtc: '18:00',
           expectedEngagementMultiplier: 2.1,
-          audienceActivityRationale: 'Community and event card link clicks peak mid-afternoon.',
+          audienceActivityRationale: `Community post and resource link clicks peak mid-afternoon.`,
         },
         {
           channel: 'telegram',
           peakPostingWindow: '09:00 AM & 05:00 PM EST',
           optimalDays: ['Tuesday', 'Thursday'],
           recommendedTimeUtc: '14:00',
-          expectedEngagementMultiplier: 2.5,
-          audienceActivityRationale: 'Immediate push notification open rates peak during start and end of workday.',
+          expectedEngagementMultiplier: 2.4,
+          audienceActivityRationale: `Notification open rates peak during start and end of workday.`,
         },
       ],
-      marketOpportunityScore: 94,
-      researchSummary: `Market research signals high demand for grounded multi-agent content governance in ${industry}. Positioning ${topicOrProduct} with transparent RAG proof and automated safety checks yields optimal audience conversion.`,
+      marketOpportunityScore: 92,
+      researchSummary: `Market research signals strong opportunity for ${topicOrProduct} in ${industry}. Positioning with clear evidence and transparent service standards yields optimal audience trust and conversion.`,
     };
 
     const res = await modelGateway.generateStructured({
@@ -122,7 +130,7 @@ Requested Channels: ${channels.join(', ')}`;
       },
       provenance: {
         model: res.modelUsed,
-        promptVersion: 'v1.0-market-research',
+        promptVersion: 'v2.0-dynamic-market-research',
         policyVersion: 'v1.0',
       },
     };

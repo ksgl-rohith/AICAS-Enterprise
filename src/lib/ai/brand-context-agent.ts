@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { AgentResult, AgentTask, EvidenceReference } from './agent-contract';
+import { brandContextPackageBuilder, BrandContextPackage } from './brand-context-package';
+import { brandContextReadinessGate, BrandContextReadinessResult } from './brand-context-readiness-gate';
 
 export interface BrandContextInput {
   brandId: string;
@@ -7,6 +9,8 @@ export interface BrandContextInput {
 }
 
 export interface BrandContextOutput {
+  package: BrandContextPackage;
+  readiness: BrandContextReadinessResult;
   brandName: string;
   industry: string;
   description: string;
@@ -28,48 +32,22 @@ export interface BrandContextOutput {
 export class BrandContextAgent {
   public async execute(task: AgentTask<BrandContextInput>): Promise<AgentResult<BrandContextOutput>> {
     const startTime = Date.now();
-    const brand = await db.brand.findUnique({
-      where: { id: task.brandId },
-      include: {
-        knowledgeDocs: true,
-        knowledgeChunks: true,
-      },
-    });
+    const pkg = await brandContextPackageBuilder.buildPackage(task.input.brandId, task.input.query, task.tenantId || 'tenant-default');
 
-    if (!brand) {
+    if (!pkg) {
+      const readiness = brandContextReadinessGate.evaluateReadiness(null);
       return {
         taskId: task.taskId,
         status: 'failed',
         confidence: 0,
-        warnings: ['Brand not found'],
+        warnings: ['Brand not found in database.'],
         evidence: [],
       };
     }
 
-    const query = task.input.query?.toLowerCase() || '';
-    
-    // Rank & retrieve relevant knowledge chunks
-    const rankedChunks = brand.knowledgeChunks
-      .map((chunk) => {
-        let score = 0.5;
-        if (query) {
-          const contentLower = chunk.content.toLowerCase();
-          const queryWords = query.split(' ').filter((w) => w.length > 3);
-          const matches = queryWords.filter((word) => contentLower.includes(word));
-          score = matches.length > 0 ? 0.6 + (matches.length / queryWords.length) * 0.35 : 0.2;
-        }
-        const doc = brand.knowledgeDocs.find((d) => d.id === chunk.documentId);
-        return {
-          chunkId: chunk.id,
-          filename: doc?.filename || 'Document',
-          content: chunk.content,
-          score: Math.min(1.0, score),
-        };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+    const readiness = brandContextReadinessGate.evaluateReadiness(pkg);
 
-    const evidence: EvidenceReference[] = rankedChunks.map((c) => ({
+    const evidence: EvidenceReference[] = pkg.groundedChunks.map((c) => ({
       chunkId: c.chunkId,
       filename: c.filename,
       sourceText: c.content.slice(0, 100) + '...',
@@ -77,32 +55,39 @@ export class BrandContextAgent {
     }));
 
     const output: BrandContextOutput = {
-      brandName: brand.name,
-      industry: brand.industry,
-      description: brand.description,
-      targetAudience: brand.targetAudience,
-      personality: brand.personality,
-      tone: brand.tone,
-      preferredVocabulary: brand.preferredVocabulary.split(',').map((s) => s.trim()).filter(Boolean),
-      prohibitedPhrases: brand.prohibitedPhrases.split(',').map((s) => s.trim()).filter(Boolean),
-      requiredDisclaimers: brand.requiredDisclaimers.split(',').map((s) => s.trim()).filter(Boolean),
-      defaultCTA: brand.defaultCTA,
-      groundedChunks: rankedChunks,
+      package: pkg,
+      readiness,
+      brandName: pkg.brandName,
+      industry: pkg.industry,
+      description: pkg.description,
+      targetAudience: pkg.targetAudience,
+      personality: pkg.personality,
+      tone: pkg.tone,
+      preferredVocabulary: pkg.preferredVocabulary,
+      prohibitedPhrases: pkg.prohibitedPhrases,
+      requiredDisclaimers: pkg.requiredDisclaimers,
+      defaultCTA: pkg.defaultCTA,
+      groundedChunks: pkg.groundedChunks,
     };
+
+    const warnings: string[] = [...readiness.warnings];
+    if (!readiness.sufficientForGeneration) {
+      warnings.unshift(`Brand context readiness is low (${Math.round(readiness.readinessScore * 100)}%).`);
+    }
 
     return {
       taskId: task.taskId,
-      status: 'completed',
+      status: readiness.sufficientForGeneration ? 'completed' : 'needs_revision',
       output,
-      confidence: 0.98,
-      warnings: rankedChunks.length === 0 ? ['No grounded knowledge documents found for brand.'] : [],
+      confidence: readiness.readinessScore,
+      warnings,
       evidence,
       usage: {
         latencyMs: Date.now() - startTime,
       },
       provenance: {
-        model: 'brand-context-retriever-v1',
-        promptVersion: 'v1.0',
+        model: 'brand-context-package-builder-v2',
+        promptVersion: 'v2.0',
         policyVersion: 'v1.0',
       },
     };

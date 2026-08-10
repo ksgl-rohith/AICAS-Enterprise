@@ -295,35 +295,39 @@ export class ModelGateway {
       telemetryService.recordMetric('cost_anomalies', costUsd, { tenantId, agentRunId: agentName });
     }
 
-    await db.costUsageRecord.create({
-      data: {
-        tenantId,
-        agentName,
-        modelName,
-        billingClass,
-        billingSubtype,
-        routingReason,
-        tier,
-        inputTokens,
-        outputTokens,
-        estimatedCostUsd: costUsd,
-        actualCostUsd: costUsd,
-        isAnomaly,
-      },
-    });
+    try {
+      await db.costUsageRecord.create({
+        data: {
+          tenantId,
+          agentName,
+          modelName,
+          billingClass,
+          billingSubtype,
+          routingReason,
+          tier,
+          inputTokens,
+          outputTokens,
+          estimatedCostUsd: costUsd,
+          actualCostUsd: costUsd,
+          isAnomaly,
+        },
+      });
 
-    await db.costBudget.upsert({
-      where: { tenantId },
-      create: {
-        tenantId,
-        spentUsd: costUsd,
-        tokensUsed: inputTokens + outputTokens,
-      },
-      update: {
-        spentUsd: { increment: costUsd },
-        tokensUsed: { increment: inputTokens + outputTokens },
-      },
-    });
+      await db.costBudget.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          spentUsd: costUsd,
+          tokensUsed: inputTokens + outputTokens,
+        },
+        update: {
+          spentUsd: { increment: costUsd },
+          tokensUsed: { increment: inputTokens + outputTokens },
+        },
+      });
+    } catch (err) {
+      console.warn('[ModelGateway] Non-fatal telemetry cost usage record warning:', err);
+    }
   }
 }
 

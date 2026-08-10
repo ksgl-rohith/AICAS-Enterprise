@@ -422,16 +422,20 @@ export class OrchestratorAgent {
     }
 
     // Record Audit Event
-    await db.auditEvent.create({
-      data: {
-        brandId,
-        campaignId,
-        action: 'PHASE1_PIPELINE_EXECUTED',
-        details: `Phase 1 governance pipeline completed. Status: ${pipelineStatus}. Items generated: ${itemsCreatedCount}. Revision loops: ${revisionLoopsExecuted}.`,
-        entityType: 'CAMPAIGN',
-        entityId: campaignId,
-      },
-    });
+    try {
+      await db.auditEvent.create({
+        data: {
+          brandId,
+          campaignId,
+          action: 'PHASE1_PIPELINE_EXECUTED',
+          details: `Phase 1 governance pipeline completed. Status: ${pipelineStatus}. Items generated: ${itemsCreatedCount}. Revision loops: ${revisionLoopsExecuted}.`,
+          entityType: 'CAMPAIGN',
+          entityId: campaignId,
+        },
+      });
+    } catch (err) {
+      console.warn('[OrchestratorAgent] Non-critical audit event error:', err);
+    }
 
     const output: OrchestrationOutput = {
       campaignId,

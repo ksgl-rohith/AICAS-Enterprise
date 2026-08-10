@@ -4,57 +4,57 @@
 
 @layer base {
   :root {
-    --canvas-bg: #f8fafc;
-    --surface-card: #ffffff;
+    --background: #f8fafc;
+    --surface: #ffffff;
     --surface-elevated: #ffffff;
-    --surface-inset: #f1f5f9;
+    --surface-muted: #f1f5f9;
     --surface-hover: #f1f5f9;
 
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --text-inverted: #ffffff;
+    --foreground: #0f172a;
+    --foreground-secondary: #334155;
+    --foreground-muted: #64748b;
+    --foreground-inverted: #ffffff;
 
-    --border-subtle: #e2e8f0;
+    --border: #e2e8f0;
     --border-strong: #cbd5e1;
-    --border-focus: #6366f1;
+    --focus-ring: #6366f1;
 
-    --accent-primary: #4f46e5;
-    --accent-primary-hover: #4338ca;
-    --accent-surface: #eef2ff;
-
-    --badge-neutral-bg: #f1f5f9;
-    --badge-neutral-text: #475569;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --info: #3b82f6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
   }
 
   .dark {
-    --canvas-bg: #090d16;
-    --surface-card: #111827;
-    --surface-elevated: #1f2937;
-    --surface-inset: #090d16;
-    --surface-hover: #1f2937;
+    --background: #090d16;
+    --surface: #0f172a;
+    --surface-elevated: #1e293b;
+    --surface-muted: #020617;
+    --surface-hover: #1e293b;
 
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --text-inverted: #0f172a;
+    --foreground: #f8fafc;
+    --foreground-secondary: #cbd5e1;
+    --foreground-muted: #94a3b8;
+    --foreground-inverted: #0f172a;
 
-    --border-subtle: #1e293b;
+    --border: #1e293b;
     --border-strong: #334155;
-    --border-focus: #6366f1;
+    --focus-ring: #6366f1;
 
-    --accent-primary: #6366f1;
-    --accent-primary-hover: #818cf8;
-    --accent-surface: #1e1b4b;
-
-    --badge-neutral-bg: #1e293b;
-    --badge-neutral-text: #94a3b8;
+    --primary: #6366f1;
+    --primary-hover: #818cf8;
+    --info: #60a5fa;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
   }
 }
 
 body {
-  color: var(--text-primary);
-  background-color: var(--canvas-bg);
+  color: var(--foreground);
+  background-color: var(--background);
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
@@ -82,29 +82,29 @@ body {
 
 /* Clean Enterprise Card Panels */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid var(--border);
 }
 
 .dark .glass-panel {
-  background: rgba(17, 24, 39, 0.95);
+  background: rgba(15, 23, 42, 0.96);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(241, 245, 249, 1);
+  border: 1px solid var(--border);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
 .dark .glass-card {
-  background: rgba(17, 24, 39, 0.95);
+  background: rgba(15, 23, 42, 0.96);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(30, 41, 59, 1);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
 }
 
 /* Tabular numerals for statistics & tables */

@@ -109,7 +109,7 @@ export default function BrandsPage() {
                   <span>Manage Knowledge Base</span>
                 </Link>
                 <Link
-                  href={`/brands/${brand.id}/knowledge`}
+                  href={`/brands/${brand.id}`}
                   className="text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium flex items-center gap-1"
                 >
                   View DNA Details <ChevronRight className="w-4 h-4" />

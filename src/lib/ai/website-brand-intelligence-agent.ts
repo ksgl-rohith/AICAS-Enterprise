@@ -412,19 +412,23 @@ ${fetchedText.slice(0, 3000)}`;
     };
 
     // Log audit event for website extraction
-    await auditService.recordEvent({
-      tenantId,
-      category: 'Knowledge / RAG',
-      action: 'brand.website_extracted',
-      details: `Extracted Brand DNA intelligence for ${domain} (${extractedData.industry})`,
-      entityType: 'IngestionSource',
-      metadata: {
-        url: targetUrl,
-        domain,
-        industry: extractedData.industry,
-        brandName: extractedData.brandName,
-      },
-    });
+    try {
+      await auditService.recordEvent({
+        tenantId,
+        category: 'Knowledge / RAG',
+        action: 'brand.website_extracted',
+        details: `Extracted Brand DNA intelligence for ${domain} (${extractedData.industry})`,
+        entityType: 'IngestionSource',
+        metadata: {
+          url: targetUrl,
+          domain,
+          industry: extractedData.industry,
+          brandName: extractedData.brandName,
+        },
+      });
+    } catch (auditErr) {
+      console.warn('[WebsiteBrandIntelligenceAgent] Non-fatal audit log warning:', auditErr);
+    }
 
     return intelligence;
   }

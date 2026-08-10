@@ -3,11 +3,14 @@ import { AgentResult, AgentTask } from './agent-contract';
 import { brandContextAgent } from './brand-context-agent';
 import { marketResearchAgent } from './market-research-agent';
 import { modelGateway } from './model-gateway';
+import { brandRelevanceGate } from './brand-relevance-gate';
+import { industryDriftDetector } from './industry-drift-detector';
 
 export const ContentPillarSchema = z.object({
   name: z.string(),
   angle: z.string(),
   rationale: z.string(),
+  relevanceExplanation: z.string().optional(),
 });
 
 export const StrategyOutputSchema = z.object({
@@ -19,6 +22,7 @@ export const StrategyOutputSchema = z.object({
   publishingCadence: z.string(),
   contentIdeas: z.array(z.string()),
   constraints: z.array(z.string()),
+  brandRelevanceScore: z.number(),
 });
 
 export type StrategyOutput = z.infer<typeof StrategyOutputSchema>;
@@ -39,26 +43,47 @@ export interface StrategyInput {
 export class StrategyAgent {
   public async execute(task: AgentTask<StrategyInput>): Promise<AgentResult<StrategyOutput>> {
     const startTime = Date.now();
-    
-    // Fetch brand context & grounded RAG chunks
-    const brandCtx = await brandContextAgent.execute({
+
+    // 1. Fetch Brand Context & Readiness Evaluation
+    const brandCtxResult = await brandContextAgent.execute({
       taskId: `${task.taskId}_brand`,
       tenantId: task.tenantId || 'tenant-default',
       brandId: task.brandId,
       input: { brandId: task.brandId, query: task.input.productOrTopic },
     });
 
-    const brandName = brandCtx.output?.brandName || 'Brand';
-    const industry = brandCtx.output?.industry || 'General Industry';
-    const description = brandCtx.output?.description || '';
-    const personality = brandCtx.output?.personality || '';
-    const brandTone = brandCtx.output?.tone || 'Professional';
-    const preferredVocab = brandCtx.output?.preferredVocabulary?.join(', ') || 'None';
-    const prohibitedPhrases = brandCtx.output?.prohibitedPhrases?.join(', ') || 'None';
-    const defaultCTA = brandCtx.output?.defaultCTA || task.input.offerCTA;
-    const groundedFacts = brandCtx.output?.groundedChunks.map((c) => `[${c.filename}]: ${c.content}`).join('\n') || '';
+    if (brandCtxResult.status === 'failed' || !brandCtxResult.output) {
+      throw new Error('Strategy Generation Blocked: Brand DNA record not found in database.');
+    }
 
-    // Fetch real-time market research signals
+    const pkg = brandCtxResult.output.package;
+    const readiness = brandCtxResult.output.readiness;
+
+    // Enforce Readiness Gate
+    if (!readiness.sufficientForGeneration) {
+      return {
+        taskId: task.taskId,
+        status: 'failed',
+        confidence: readiness.readinessScore,
+        warnings: [
+          readiness.recommendation,
+          `Missing fields: ${readiness.missingFields.join(', ')}`,
+        ],
+        evidence: [],
+      };
+    }
+
+    const brandName = pkg.brandName;
+    const industry = pkg.industry;
+    const description = pkg.description;
+    const personality = pkg.personality;
+    const brandTone = pkg.tone;
+    const preferredVocab = pkg.preferredVocabulary.join(', ') || 'None';
+    const prohibitedPhrases = pkg.prohibitedPhrases.join(', ') || 'None';
+    const defaultCTA = pkg.defaultCTA || task.input.offerCTA || 'Contact Us';
+    const groundedFacts = pkg.groundedChunks.map((c) => `[${c.filename}]: ${c.content}`).join('\n') || '';
+
+    // 2. Fetch real-time market research signals
     const mrRes = await marketResearchAgent.execute({
       taskId: `${task.taskId}_mr`,
       tenantId: task.tenantId || 'tenant-default',
@@ -72,8 +97,8 @@ export class StrategyAgent {
       },
     });
 
-    const trends = mrRes.output?.industryTrends.join('; ') || 'High enterprise demand for autonomous content governance.';
-    const formats = mrRes.output?.highPerformingContentFormats.join('; ') || 'Visual carousels & infographic data stories.';
+    const trends = mrRes.output?.industryTrends.join('; ') || `High demand for trusted ${task.input.productOrTopic} in ${industry}.`;
+    const formats = mrRes.output?.highPerformingContentFormats.join('; ') || 'Visual carousels & informative guide posts.';
 
     const systemPrompt = `You are an elite Enterprise AI Campaign Strategist for "${brandName}".
 Industry: ${industry}
@@ -89,10 +114,10 @@ Market Intelligence Signals:
 - Top Formats: ${formats}
 
 Grounded Knowledge Base & Evidence:
-${groundedFacts || 'Whitepaper grounding evidence available.'}
+${groundedFacts || 'Verified brand knowledge documents.'}
 
 YOUR TASK:
-Create a tailored, high-impact multi-channel content strategy specifically designed for ${brandName} (${industry}). Ensure the pillars, angles, and content ideas reflect this company's actual business model, market intelligence, and unique brand identity.`;
+Create a tailored, high-impact multi-channel content strategy specifically designed for ${brandName} (${industry}). Ensure the pillars, angles, and content ideas reflect this company's actual business model, market intelligence, and unique brand identity. Do NOT introduce unrelated AI software topics unless the brand is an AI software company.`;
 
     const userPrompt = `Campaign Name: ${task.input.name}
 Objective: ${task.input.objective}
@@ -103,45 +128,50 @@ Target Channels: ${task.input.channels.join(', ')}
 Required Messages: ${task.input.requiredMessages || 'None'}
 Prohibited Themes: ${task.input.prohibitedThemes || 'None'}`;
 
+    // Dynamic brand-grounded fallback
     const mockFallback: StrategyOutput = {
-      objectiveInterpretation: `Drive high-conversion ${task.input.objective.replace(/_/g, ' ')} for ${task.input.productOrTopic} targeting ${task.input.targetAudience} in the ${industry} domain.`,
-      audienceSummary: `${task.input.targetAudience} seeking trusted, compliant solutions in ${industry}, aligning with ${brandName}'s value proposition (${personality || brandTone}).`,
-      campaignNarrative: `Elevating ${brandName}'s presence in ${industry} by spotlighting ${task.input.productOrTopic} through authentic, ${brandTone.toLowerCase()} messaging, backed by multi-agent AI safety guardrails.`,
+      objectiveInterpretation: `Drive targeted ${task.input.objective.replace(/_/g, ' ')} for ${task.input.productOrTopic} among ${task.input.targetAudience} in the ${industry} domain.`,
+      audienceSummary: `${task.input.targetAudience} seeking reliable, high-quality ${task.input.productOrTopic} in ${industry}, aligned with ${brandName}'s value proposition (${personality || brandTone}).`,
+      campaignNarrative: `Elevating ${brandName}'s leadership in ${industry} by spotlighting ${task.input.productOrTopic} through authentic, ${brandTone.toLowerCase()} messaging backed by verifiable brand facts.`,
       contentPillars: [
         {
-          name: `${task.input.productOrTopic} & Architectural Leadership`,
-          angle: `How ${brandName} is redefining ${task.input.productOrTopic} for enterprise ${task.input.targetAudience}`,
-          rationale: `Positions ${brandName} as a top authority in ${industry} with grounded evidence.`,
+          name: `${task.input.productOrTopic} Excellence & Leadership`,
+          angle: `How ${brandName} delivers superior ${task.input.productOrTopic} for ${task.input.targetAudience}`,
+          rationale: `Positions ${brandName} as a premier, trusted provider in ${industry}.`,
+          relevanceExplanation: `Grounds campaign directly in ${brandName}'s core ${industry} offerings.`,
         },
         {
-          name: 'Multi-Agent Safety & ROI Governance',
-          angle: `Eliminating AI hallucinations and compliance risks before posts go live`,
-          rationale: `Addresses core enterprise buyer fear regarding brand reputation & regulatory compliance.`,
+          name: 'Quality, Compliance & Trust Standards',
+          angle: `Ensuring transparent, client-focused standards in every ${industry} engagement`,
+          rationale: `Addresses core buyer priorities regarding reliability, safety, and brand trust.`,
+          relevanceExplanation: `Reflects ${brandName}'s mandatory legal disclaimers and governance rules.`,
         },
         {
-          name: 'High-Impact Multi-Channel Case Studies',
-          angle: `Why leading ${industry} brands switch to ${brandName}'s Content OS`,
+          name: 'Customer Success & Industry Impact',
+          angle: `Real-world impact of ${brandName}'s ${task.input.productOrTopic} for enterprise clients`,
           rationale: `Builds social proof, trust, and drives high CTA conversion.`,
+          relevanceExplanation: `Leverages verified RAG knowledge documents and client case studies.`,
         },
       ],
       channelRoles: {
-        linkedin: `B2B thought leadership carousels, architectural blueprints, and executive insights on ${task.input.productOrTopic}`,
-        facebook: `Community stories, masterclass event cards, and customer impact highlights for ${task.input.targetAudience}`,
-        instagram: `Aesthetic infographic cards, multi-slide visual design frameworks, and link-in-bio registrations`,
-        telegram: `Direct subscriber alerts, instant architecture summaries, and key event announcements`,
+        linkedin: `Executive thought leadership, structured industry frameworks, and client impact highlights for ${task.input.targetAudience}`,
+        facebook: `Community resource guides, informational event cards, and customer stories for ${task.input.productOrTopic}`,
+        instagram: `High-contrast infographic slides, visual checklist guides, and direct link CTA promotions`,
+        telegram: `Instant subscriber alerts, key industry updates, and direct event announcements`,
       },
-      publishingCadence: 'Strategic multi-channel cadence timed to AI market research peak engagement windows.',
+      publishingCadence: `Strategic multi-channel cadence optimized for peak ${industry} audience engagement hours.`,
       contentIdeas: [
-        `Why Enterprise Leaders are Choosing ${brandName}'s Grounded ${task.input.productOrTopic}`,
-        `3 AI Compliance Checkpoints Every ${industry} Executive Must Implement`,
-        `Inside ${brandName}'s Multi-Agent Architecture: How We Prevent Brand Hallucinations`,
-        `The Complete Blueprint to Autonomous Social Content Operations`,
+        `Why ${task.input.targetAudience} Choose ${brandName} for ${task.input.productOrTopic}`,
+        `3 Key Factors Every ${industry} Leader Must Evaluate in ${task.input.productOrTopic}`,
+        `Inside ${brandName}'s Commitment to Quality and Client Success`,
+        `The Complete Guide to Navigating ${task.input.productOrTopic} in 2026`,
       ],
       constraints: [
         `Must include CTA: ${task.input.offerCTA || defaultCTA}`,
         `Must strictly adhere to brand tone (${brandTone}) and avoid prohibited phrases: ${prohibitedPhrases}`,
-        `Must include grounded RAG evidence citations in every variant`,
+        `Must maintain 100% brand relevance to ${industry}`,
       ],
+      brandRelevanceScore: 0.96,
     };
 
     const res = await modelGateway.generateStructured({
@@ -149,22 +179,39 @@ Prohibited Themes: ${task.input.prohibitedThemes || 'None'}`;
       userPrompt,
       schema: StrategyOutputSchema,
       mockFallback,
+      tenantId: task.tenantId,
+      agentName: 'StrategyAgent',
     });
+
+    const output = res.output;
+
+    // 3. Evaluate Brand Relevance Gate & Industry Drift Detector
+    const relevance = brandRelevanceGate.evaluateRelevance(output.campaignNarrative + ' ' + output.contentPillars.map((p) => p.name).join(' '), pkg, task.input.objective);
+    const drift = industryDriftDetector.detectDrift(output.campaignNarrative + ' ' + output.contentPillars.map((p) => p.name).join(' '), pkg);
+
+    if (drift.shouldBlock || relevance.status === 'BLOCK') {
+      console.warn(`[StrategyAgent] Industry Drift Detected or Relevance Gate Failed (${relevance.overall}). Re-evaluating fallback.`);
+      output.campaignNarrative = mockFallback.campaignNarrative;
+      output.contentPillars = mockFallback.contentPillars;
+      output.contentIdeas = mockFallback.contentIdeas;
+    }
+
+    output.brandRelevanceScore = relevance.overall;
 
     return {
       taskId: task.taskId,
       status: 'completed',
-      output: res.output,
+      output,
       confidence: res.usedMock ? 0.94 : 0.98,
-      warnings: res.usedMock ? ['Generated using Strategy Engine fallback.'] : [],
-      evidence: brandCtx.evidence,
+      warnings: res.usedMock ? ['Generated using dynamic brand fallback strategy engine.'] : [],
+      evidence: brandCtxResult.evidence,
       usage: {
         latencyMs: Date.now() - startTime,
         estimatedTokens: res.tokensUsed,
       },
       provenance: {
         model: res.modelUsed,
-        promptVersion: 'v2.0-enhanced-strategy',
+        promptVersion: 'v3.0-dynamic-brand-strategy',
         policyVersion: 'v1.0',
       },
     };

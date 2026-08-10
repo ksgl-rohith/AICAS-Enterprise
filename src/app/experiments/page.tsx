@@ -117,16 +117,16 @@ export default function ExperimentsPage() {
 
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
               <span className="text-slate-500 dark:text-slate-400 font-semibold block uppercase text-[10px]">Treatment (Variant B)</span>
-              <span className="text-purple-600 dark:text-purple-400 font-bold block text-sm">{(evalResult.treatmentRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
+              <span className="text-indigo-600 dark:text-indigo-300 font-bold block text-sm">{(evalResult.treatmentRate * 100).toFixed(1)}% {metric.toUpperCase()}</span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
               <span className="text-slate-500 dark:text-slate-400 font-semibold block uppercase text-[10px]">Relative Lift</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold block text-sm">+{(evalResult.relativeLift * 100).toFixed(1)}%</span>
+              <span className="text-emerald-600 dark:text-emerald-300 font-bold block text-sm">+{(evalResult.relativeLift * 100).toFixed(1)}%</span>
             </div>
           </div>
 
-          <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 leading-relaxed">
+          <p className="text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 leading-relaxed font-medium">
             {evalResult.explanation}
           </p>
         </div>

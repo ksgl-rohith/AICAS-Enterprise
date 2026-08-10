@@ -6,11 +6,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { url } = body;
 
-    if (!url) {
+    if (!url || typeof url !== 'string' || !url.trim()) {
       return NextResponse.json({ error: 'Website URL parameter is required.' }, { status: 400 });
     }
 
-    const intel = await websiteBrandIntelligenceAgent.extractBrandIntelligence(url, 'tenant-default');
+    const intel = await websiteBrandIntelligenceAgent.extractBrandIntelligence(url.trim(), 'tenant-default');
 
     // Return extracted fields for UI auto-fill & evidence popovers
     return NextResponse.json({
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       intelligence: intel,
     });
   } catch (error: any) {
+    console.error('[ingest-url] Extraction error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to extract website Brand DNA intelligence.' },
       { status: 400 }

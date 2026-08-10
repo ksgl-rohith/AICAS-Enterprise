@@ -67,7 +67,7 @@ export default function RecommendationsPage() {
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase">{rec.targetChannel}</span>
                   <Badge variant="purple">Source: {rec.source}</Badge>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Confidence: {(rec.confidence * 100).toFixed(0)}%</span>
+                  <span className="text-xs text-slate-700 dark:text-slate-200 font-mono font-bold">Confidence: {(rec.confidence * 100).toFixed(0)}%</span>
                 </div>
 
                 <Badge variant={rec.status === 'approved' ? 'emerald' : rec.status === 'rejected' ? 'red' : 'amber'}>
@@ -76,14 +76,14 @@ export default function RecommendationsPage() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm">{rec.recommendedTopic}</h3>
-                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{rec.explanation}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm md:text-base">{rec.recommendedTopic}</h3>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-normal">{rec.explanation}</p>
               </div>
 
               {rec.proposedPolicyUpdate && (
-                <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-900/40 space-y-1">
-                  <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase font-bold block">Proposed Policy Memory Update</span>
-                  <p className="text-slate-800 dark:text-slate-200">{rec.proposedPolicyUpdate}</p>
+                <div className="p-3.5 rounded-xl bg-purple-500/10 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/60 space-y-1">
+                  <span className="text-[10px] text-purple-600 dark:text-purple-300 uppercase font-extrabold tracking-wider block">Proposed Policy Memory Update</span>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium">{rec.proposedPolicyUpdate}</p>
                 </div>
               )}
 

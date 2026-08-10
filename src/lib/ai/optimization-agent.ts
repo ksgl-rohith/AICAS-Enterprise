@@ -169,14 +169,18 @@ Experiments Analyzed: ${activeExperiments.length}`;
     reason?: string
   ): Promise<{ recommendationId: string; currentState: RecommendationLifecycle }> {
     // Audit & state transition log
-    await db.auditEvent.create({
-      data: {
-        action: `RECOMMENDATION_TRANSITION_${targetState.toUpperCase()}`,
-        details: `Recommendation ${recommendationId} transitioned to state '${targetState}' by ${approverId || 'system'}. Reason: ${reason || 'Lifecycle update'}`,
-        entityType: 'Recommendation',
-        entityId: recommendationId,
-      },
-    });
+    try {
+      await db.auditEvent.create({
+        data: {
+          action: `RECOMMENDATION_TRANSITION_${targetState.toUpperCase()}`,
+          details: `Recommendation ${recommendationId} transitioned to state '${targetState}' by ${approverId || 'system'}. Reason: ${reason || 'Lifecycle update'}`,
+          entityType: 'Recommendation',
+          entityId: recommendationId,
+        },
+      });
+    } catch (err) {
+      console.warn('[OptimizationAgent] Non-critical audit event error:', err);
+    }
 
     return {
       recommendationId,

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - APP_URL=http://localhost:3000
+      - DATABASE_URL=file:/app/prisma/data/prod.db
+      - AI_MODE=gemini
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PUBLISHING_MODE=simulated
+      - OAUTH_STATE_SECRET=${OAUTH_STATE_SECRET:-aicas_super_secret_state_token_key_12345}
+      - PLATFORM_TOKEN_ENCRYPTION_KEY=${PLATFORM_TOKEN_ENCRYPTION_KEY:-39f847291a58c40b2e3194a8f9021c4b}
+    volumes:
+      - sqlite_data:/app/prisma/data
+    restart: always
+
+volumes:
+  sqlite_data:

@@ -59,24 +59,28 @@ export class AuditService {
       sanitizedMetadataJson = JSON.stringify(sanitized);
     }
 
-    const event = await db.auditEvent.create({
-      data: {
-        tenantId,
-        category: params.category,
-        severity,
-        action: params.action,
-        details: params.details,
-        entityType,
-        entityId,
-        userId: params.userId || null,
-        brandId: params.brandId || null,
-        campaignId: params.campaignId || null,
-        correlationId: params.correlationId || null,
-        metadataJson: sanitizedMetadataJson || null,
-      },
-    });
-
-    return event;
+    try {
+      const event = await db.auditEvent.create({
+        data: {
+          tenantId,
+          category: params.category,
+          severity,
+          action: params.action,
+          details: params.details,
+          entityType,
+          entityId,
+          userId: params.userId || null,
+          brandId: params.brandId || null,
+          campaignId: params.campaignId || null,
+          correlationId: params.correlationId || null,
+          metadataJson: sanitizedMetadataJson || null,
+        },
+      });
+      return event;
+    } catch (err) {
+      console.warn('[AuditService] Failed to persist audit record:', err);
+      return null;
+    }
   }
 
   /**

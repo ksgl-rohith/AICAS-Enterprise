@@ -37,11 +37,11 @@ Quote/Stat: ${quoteOrStat || 'N/A'}`;
     const mockFallback: StaticVisualOutput = {
       visualType: quoteOrStat ? 'quote_card' : 'stat_callout',
       headline: topicTitle,
-      primaryText: quoteOrStat || `“Deploying multi-agent AI governance is no longer optional—it is the single highest leverage capability for modern marketing leaders.”`,
-      authorOrSource: authorOrSource || `${brandName} AI Insights Lab`,
-      badgeText: 'Executive Perspective',
-      accentColor: '#8B5CF6',
-      backgroundTheme: 'dark_gradient',
+      primaryText: quoteOrStat || `“Excellence, transparency, and client trust define ${brandName}'s approach to ${topicTitle} in ${industry}.”`,
+      authorOrSource: authorOrSource || `${brandName} Leadership`,
+      badgeText: `${industry} Insights`,
+      accentColor: '#6366f1',
+      backgroundTheme: 'dark_slate_gradient',
       layoutFormat: 'Minimalist Typography Card with Metallic Accent Borders',
     };
 
@@ -65,7 +65,7 @@ Quote/Stat: ${quoteOrStat || 'N/A'}`;
       },
       provenance: {
         model: res.modelUsed,
-        promptVersion: 'v1.0-static-visual-agent',
+        promptVersion: 'v2.0-dynamic-static-visual',
         policyVersion: 'v1.0',
       },
     };
