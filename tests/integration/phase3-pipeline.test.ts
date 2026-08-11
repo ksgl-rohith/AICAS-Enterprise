@@ -44,7 +44,7 @@ describe('Phase 3 Complete Closed-Loop End-to-End Campaign Lifecycle Integration
     expect(approvalReq.status).toBe('PENDING');
 
     const approvedReq = await approvalService.approve(approvalReq.id, 'admin_reviewer_p3');
-    expect(approvedReq.status).toBe('APPROVED');
+    expect(approvedReq?.status).toBe('APPROVED');
 
     // 3. SCHEDULE
     const schedTask = createBaseTask(tenantId, brandId, {

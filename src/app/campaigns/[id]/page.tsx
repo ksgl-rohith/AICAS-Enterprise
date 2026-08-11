@@ -9,44 +9,34 @@ import {
   Sparkles,
   Layers,
   CheckCircle2,
-  ChevronRight,
   CalendarDays,
   Radio,
-  Edit3,
-  Save,
-  RotateCcw,
-  ShieldCheck,
-  Building2,
-  Target,
   FileText,
-  UserCheck,
+  TrendingUp,
+  FlaskConical,
+  History,
+  Send,
+  Plus,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
+import { CampaignLifecycleTimeline } from '@/components/campaign/campaign-lifecycle-timeline';
+import { EstimatedAnalyticsCard } from '@/components/campaign/estimated-analytics-card';
 
-export default function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default function CampaignWorkspacePage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  // Edit / Human Rewrite State
-  const [editingNarrative, setEditingNarrative] = useState(false);
-  const [savingNarrative, setSavingNarrative] = useState(false);
-
-  const [humanNarrative, setHumanNarrative] = useState('');
-  const [humanObjectiveText, setHumanObjectiveText] = useState('');
-  const [humanAudienceText, setHumanAudienceText] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'strategy' | 'content_plan' | 'posts' | 'approvals' | 'schedule' | 'analytics' | 'experiments' | 'audit'>('overview');
+  const [approvingStrategy, setApprovingStrategy] = useState(false);
 
   const fetchCampaign = () => {
     fetch(`/api/campaigns/${params.id}`)
       .then((res) => res.json())
       .then((data) => {
         setCampaign(data);
-        if (data.strategy) {
-          setHumanNarrative(data.strategy.campaignNarrative || '');
-          setHumanObjectiveText(data.strategy.objectiveInterpretation || '');
-          setHumanAudienceText(data.strategy.audienceSummary || '');
-        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -56,33 +46,21 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     fetchCampaign();
   }, [params.id]);
 
-  const handleSaveHumanStrategyEdit = async () => {
-    if (!campaign.strategy) return;
-    setSavingNarrative(true);
+  const handleApproveStrategy = async () => {
+    setApprovingStrategy(true);
     try {
-      const res = await fetch(`/api/campaigns/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategy: {
-            ...campaign.strategy,
-            campaignNarrative: humanNarrative,
-            objectiveInterpretation: humanObjectiveText,
-            audienceSummary: humanAudienceText,
-          },
-        }),
-      });
-
+      const res = await fetch(`/api/campaigns/${params.id}/approve-strategy`, { method: 'POST' });
+      const data = await res.json();
       if (res.ok) {
-        setEditingNarrative(false);
+        alert(`Strategy approved! Generated ${data.contentCount || 0} content items & scheduling entries.`);
         fetchCampaign();
       } else {
-        alert('Failed to save human edits.');
+        alert(data.error || 'Failed to approve strategy.');
       }
     } catch {
-      alert('Network error while saving human edits.');
+      alert('Network error approving strategy.');
     } finally {
-      setSavingNarrative(false);
+      setApprovingStrategy(false);
     }
   };
 
@@ -97,10 +75,35 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
   const strategy = campaign.strategy;
   const pillars = strategy ? JSON.parse(strategy.contentPillarsJson || '[]') : [];
+  const contentItems = campaign.contentItems || [];
+  const schedules = campaign.schedules || [];
+  const isApproved = campaign.status === 'STRATEGY_APPROVED' || campaign.status === 'SCHEDULED' || campaign.status === 'ACTIVE';
+
+  const timelineSteps = [
+    { key: 'created', label: 'Campaign Created', status: 'completed' as const },
+    { key: 'strategy', label: 'Strategy Generated', status: strategy ? 'completed' as const : 'current' as const },
+    { key: 'approved', label: 'Strategy Approved', status: isApproved ? 'completed' as const : strategy ? 'current' as const : 'pending' as const },
+    { key: 'planning', label: 'Content Plan & Posts', status: contentItems.length > 0 ? 'completed' as const : 'pending' as const },
+    { key: 'scheduled', label: 'Scheduling & Calendar', status: schedules.length > 0 ? 'completed' as const : 'pending' as const },
+  ];
+
+  const mockForecast = {
+    predictedMetrics: {
+      impressions: { estimate: 14500, lowerBound: 11200, upperBound: 18900, confidence: 'Medium' },
+      engagementRate: { estimate: 0.048, lowerBound: 0.035, upperBound: 0.061, confidence: 'Medium' },
+    },
+    dataSufficiency: contentItems.length > 0 ? 'Moderate' : 'ColdStart',
+    confidence: contentItems.length > 0 ? 'Medium' : 'Low',
+    factors: [
+      'Visual carousel format historically yields +22% higher engagement',
+      'Targeting mid-week audience peak posting window (Tuesday / Thursday 14:00 UTC)',
+      'Grounding score: 100% verified brand facts',
+    ],
+    sampleSize: 24,
+  };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Top Header */}
       <PageHeader
         eyebrow={`Campaign Operations • ${campaign.brand?.name || 'Brand'}`}
         title={campaign.name}
@@ -112,259 +115,192 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <Link
-              href={`/campaigns/${campaign.id}/strategy`}
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm shadow-purple-600/30 flex items-center gap-2 transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>AI Strategy Workspace</span>
-            </Link>
+            {!isApproved ? (
+              <button
+                onClick={handleApproveStrategy}
+                disabled={approvingStrategy || !strategy}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm shadow-emerald-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{approvingStrategy ? 'Approving & Planning...' : 'Approve Strategy & Generate Content'}</span>
+              </button>
+            ) : (
+              <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs border border-emerald-500/30 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" /> STRATEGY APPROVED
+              </span>
+            )}
 
             <Link
-              href={`/campaigns/${campaign.id}/content`}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/30 flex items-center gap-2 transition-all"
+              href={`/campaigns/${campaign.id}/strategy`}
+              className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm shadow-purple-600/30 flex items-center gap-1.5 transition-all"
             >
-              <Layers className="w-4 h-4" />
-              <span>Content Studio</span>
+              <Sparkles className="w-4 h-4" />
+              <span>Strategy Studio</span>
             </Link>
           </div>
         }
       />
 
-      {/* Primary Workspaces Navigator Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Link
-          href={`/campaigns/${campaign.id}/strategy`}
-          className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500 dark:hover:border-purple-500/80 transition-all flex items-center justify-between group shadow-xs"
-        >
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-bold text-xs">
-              <Sparkles className="w-4 h-4" />
-              <span>AI Strategy & Content Pillars</span>
-              {strategy && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-bold">
-                  GENERATED
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              {strategy
-                ? `${pillars.length} Strategic Pillars established with multi-channel role assignments.`
-                : 'Click to execute StrategyAgent and assemble grounded content pillars.'}
-            </p>
-          </div>
-          <ChevronRight className="w-5 h-5 text-purple-500 group-hover:translate-x-1 transition-transform shrink-0" />
-        </Link>
+      <CampaignLifecycleTimeline steps={timelineSteps} />
 
-        <Link
-          href={`/campaigns/${campaign.id}/content`}
-          className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500/80 transition-all flex items-center justify-between group shadow-xs"
-        >
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs">
-              <Layers className="w-4 h-4" />
-              <span>Multi-Agent Content Studio</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
-                {campaign.contentItems?.length || 0} DRAFTS
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              Copywriting & visual layout briefs generated across LinkedIn, Facebook, Instagram, & Telegram.
-            </p>
-          </div>
-          <ChevronRight className="w-5 h-5 text-indigo-500 group-hover:translate-x-1 transition-transform shrink-0" />
-        </Link>
+      {/* Workspace Sub-Navigation Tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto pb-px">
+        {[
+          { id: 'overview', label: 'Overview', icon: Megaphone },
+          { id: 'strategy', label: 'Strategy', icon: Sparkles },
+          { id: 'content_plan', label: 'Content Plan', icon: FileText },
+          { id: 'posts', label: `Posts (${contentItems.length})`, icon: Layers },
+          { id: 'approvals', label: 'Approvals', icon: CheckCircle2 },
+          { id: 'schedule', label: `Schedule (${schedules.length})`, icon: CalendarDays },
+          { id: 'analytics', label: 'Analytics & Forecast', icon: TrendingUp },
+          { id: 'experiments', label: 'Experiments', icon: FlaskConical },
+          { id: 'audit', label: 'Audit Log', icon: History },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-3.5 py-2.5 rounded-t-xl text-xs font-semibold flex items-center gap-2 border-b-2 shrink-0 transition-all ${
+                isActive
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* AI Strategy Suggestion & Human Rewrite Workspace Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-500" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                AI Campaign Narrative & Strategy Suggestions
-              </h2>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
-                AI SUGGESTION
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Review AI suggestions below. Human marketers can edit and rewrite any strategy narrative or positioning text.
-            </p>
-          </div>
-
-          {strategy && (
-            <div>
-              {!editingNarrative ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingNarrative(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Human Rewrite Mode</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingNarrative(false)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveHumanStrategyEdit}
-                    disabled={savingNarrative}
-                    className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{savingNarrative ? 'Saving...' : 'Save Human Overrides'}</span>
-                  </button>
-                </div>
-              )}
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Action Required Banner */}
+          {!isApproved && (
+            <div className="p-5 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <span className="font-bold text-purple-900 dark:text-purple-200 text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-600" /> Action Required: Review & Approve Strategy
+                </span>
+                <p className="text-purple-700 dark:text-purple-300">
+                  StrategyAgent has generated campaign pillars. Approve strategy below to automatically run Content Planning and scheduling.
+                </p>
+              </div>
+              <button
+                onClick={handleApproveStrategy}
+                disabled={approvingStrategy || !strategy}
+                className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-sm hover:bg-purple-500 shrink-0"
+              >
+                {approvingStrategy ? 'Approving...' : 'Approve Strategy Now'}
+              </button>
             </div>
           )}
-        </div>
 
-        {!strategy ? (
-          <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs space-y-3">
-            <p>No strategy narrative generated yet.</p>
-            <Link
-              href={`/campaigns/${campaign.id}/strategy`}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 text-white font-semibold text-xs shadow-sm"
-            >
-              <Sparkles className="w-4 h-4" /> Execute Strategy Agent
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Master Narrative */}
-            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                  Master Campaign Narrative
-                </span>
-                <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
-                  <UserCheck className="w-3 h-3 text-indigo-400" /> Human Override Supported
-                </span>
-              </div>
-
-              {!editingNarrative ? (
-                <p className="text-sm font-semibold text-slate-900 dark:text-white leading-relaxed">
-                  "{strategy.campaignNarrative}"
-                </p>
-              ) : (
-                <textarea
-                  rows={3}
-                  value={humanNarrative}
-                  onChange={(e) => setHumanNarrative(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500 text-xs text-slate-900 dark:text-white focus:outline-none"
-                  placeholder="Rewrite campaign narrative..."
-                />
-              )}
-            </div>
-
-            {/* Objective & Audience Summaries */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase block">
-                  AI Objective Interpretation
-                </span>
-                {!editingNarrative ? (
-                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                    {strategy.objectiveInterpretation}
-                  </p>
-                ) : (
-                  <textarea
-                    rows={2}
-                    value={humanObjectiveText}
-                    onChange={(e) => setHumanObjectiveText(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500 text-xs text-slate-900 dark:text-white"
-                  />
-                )}
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase block">
-                  AI Audience Alignment Summary
-                </span>
-                {!editingNarrative ? (
-                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                    {strategy.audienceSummary}
-                  </p>
-                ) : (
-                  <textarea
-                    rows={2}
-                    value={humanAudienceText}
-                    onChange={(e) => setHumanAudienceText(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500 text-xs text-slate-900 dark:text-white"
-                  />
-                )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" /> Master Strategy Narrative
+              </h3>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                "{strategy?.campaignNarrative || 'No strategy narrative generated yet.'}"
+              </p>
+              <div className="pt-2">
+                <Link
+                  href={`/campaigns/${campaign.id}/strategy`}
+                  className="text-xs text-purple-600 dark:text-purple-400 font-semibold hover:underline flex items-center gap-1"
+                >
+                  View Full Strategy Workspace & Pillars &rarr;
+                </Link>
               </div>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Generated Content Items Table */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-500" /> Generated Content Drafts ({campaign.contentItems?.length || 0})
-          </h2>
-          <Link
-            href={`/campaigns/${campaign.id}/content`}
-            className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1"
-          >
-            Open Content Studio &rarr;
-          </Link>
+            <EstimatedAnalyticsCard forecast={mockForecast} />
+          </div>
         </div>
+      )}
 
-        {(!campaign.contentItems || campaign.contentItems.length === 0) ? (
-          <div className="text-center py-8 text-slate-400 text-xs space-y-2">
-            <p>No content items generated yet for this campaign.</p>
-            <Link
-              href={`/campaigns/${campaign.id}/strategy`}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 text-white font-semibold text-xs shadow-sm"
-            >
-              <Sparkles className="w-4 h-4" /> Generate Strategy & Content
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {campaign.contentItems.map((item: any, idx: number) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white">{item.title}</h4>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {item.format}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Pillar: {item.contentPillar}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
-                    {item.status}
-                  </span>
-                  <Link
-                    href={`/campaigns/${campaign.id}/content`}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-xs transition-all"
-                  >
-                    Edit / Rewrite Copy
-                  </Link>
-                </div>
+      {/* Strategy Tab */}
+      {activeTab === 'strategy' && (
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            Strategic Content Pillars ({pillars.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {pillars.map((p: any, idx: number) => (
+              <div key={idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+                <h4 className="font-bold text-slate-900 dark:text-white">{p.name}</h4>
+                <p className="text-indigo-600 dark:text-indigo-300 font-semibold">Angle: {p.angle}</p>
+                <p className="text-slate-600 dark:text-slate-400">{p.rationale}</p>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Posts Tab */}
+      {(activeTab === 'posts' || activeTab === 'content_plan') && (
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Generated Content Items ({contentItems.length})
+            </h3>
+            <Link href={`/campaigns/${campaign.id}/content`} className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+              Open Content Studio &rarr;
+            </Link>
+          </div>
+
+          {contentItems.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">No posts generated yet. Approve strategy to generate posts automatically.</div>
+          ) : (
+            <div className="space-y-3">
+              {contentItems.map((item: any) => (
+                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-white">{item.title}</h4>
+                    <p className="text-[11px] text-slate-500">Pillar: {item.contentPillar} • Format: {item.format}</p>
+                  </div>
+                  <Badge variant="indigo">{item.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Schedule Tab */}
+      {activeTab === 'schedule' && (
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-indigo-500" /> Scheduled Posts Queue ({schedules.length})
+            </h3>
+            <Link href="/calendar" className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+              Open Calendar Page &rarr;
+            </Link>
+          </div>
+
+          {schedules.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">No scheduled posts in queue.</div>
+          ) : (
+            <div className="space-y-3">
+              {schedules.map((s: any) => (
+                <div key={s.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-white">{s.contentItem?.title}</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Channel: <strong className="uppercase">{s.channel}</strong> • Time: {new Date(s.scheduledTime).toLocaleString()}
+                    </p>
+                  </div>
+                  <Badge variant={s.status === 'PUBLISHED' ? 'emerald' : 'amber'}>{s.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

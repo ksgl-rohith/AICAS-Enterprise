@@ -33,7 +33,7 @@ describe('Phase 2 Pipeline End-to-End Integration', () => {
 
     // 3. Approve via Human Oversight
     const approvedReq = await approvalService.approve(approvalReq.id, 'reviewer_admin_1');
-    expect(approvedReq.status).toBe('APPROVED');
+    expect(approvedReq?.status).toBe('APPROVED');
 
     // 4. Rank Scheduling Slots
     const schedTask = createBaseTask('tenant-default', 'brand_e2e_1', {

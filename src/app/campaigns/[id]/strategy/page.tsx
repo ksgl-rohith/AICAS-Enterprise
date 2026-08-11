@@ -9,20 +9,20 @@ import {
   Layers,
   RefreshCw,
   CheckCircle2,
-  ArrowRight,
-  ShieldCheck,
-  Database,
   Edit3,
   Save,
-  UserCheck,
+  Database,
+  Info,
+  BadgeAlert,
 } from 'lucide-react';
+import { CampaignLifecycleTimeline } from '@/components/campaign/campaign-lifecycle-timeline';
 
 export default function CampaignStrategyPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [generatingContent, setGeneratingContent] = useState(false);
-  const [rebuildingStrategy, setRebuildingStrategy] = useState(false);
+  const [approvingStrategy, setApprovingStrategy] = useState(false);
+  const [refreshingStrategy, setRefreshingStrategy] = useState(false);
 
   // Human Rewrite State
   const [editingNarrative, setEditingNarrative] = useState(false);
@@ -50,19 +50,37 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
     fetchCampaign();
   }, [params.id]);
 
-  const handleGenerateStrategy = async () => {
-    setRebuildingStrategy(true);
+  const handleRefreshStrategy = async () => {
+    setRefreshingStrategy(true);
     try {
-      const res = await fetch(`/api/campaigns/${params.id}/generate-strategy`, { method: 'POST' });
+      const res = await fetch(`/api/campaigns/${params.id}/refresh-strategy`, { method: 'POST' });
       if (res.ok) {
         fetchCampaign();
       } else {
-        alert('Failed to generate strategy');
+        alert('Failed to refresh strategy.');
       }
     } catch {
-      alert('Strategy generation error.');
+      alert('Strategy refresh error.');
     } finally {
-      setRebuildingStrategy(false);
+      setRefreshingStrategy(false);
+    }
+  };
+
+  const handleApproveStrategy = async () => {
+    setApprovingStrategy(true);
+    try {
+      const res = await fetch(`/api/campaigns/${params.id}/approve-strategy`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Strategy approved! Generated ${data.contentCount || 0} content items & scheduling entries.`);
+        router.push(`/campaigns/${params.id}`);
+      } else {
+        alert(data.error || 'Failed to approve strategy.');
+      }
+    } catch {
+      alert('Network error approving strategy.');
+    } finally {
+      setApprovingStrategy(false);
     }
   };
 
@@ -96,23 +114,6 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
     }
   };
 
-  const handleGenerateContent = async () => {
-    setGeneratingContent(true);
-    try {
-      const res = await fetch(`/api/campaigns/${params.id}/generate-content`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        router.push(`/campaigns/${params.id}/content`);
-      } else {
-        alert(data.error || 'Failed to generate content items.');
-        setGeneratingContent(false);
-      }
-    } catch {
-      alert('Content generation error.');
-      setGeneratingContent(false);
-    }
-  };
-
   if (loading || !campaign) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 text-xs gap-2">
@@ -127,6 +128,17 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
   const channelRoles = strategy ? JSON.parse(strategy.channelRolesJson || '{}') : {};
   const contentIdeas = strategy ? JSON.parse(strategy.contentIdeasJson || '[]') : [];
   const evidence = strategy ? JSON.parse(strategy.retrievedEvidenceJson || '[]') : [];
+  const sourceFreshness = strategy ? JSON.parse(strategy.sourceFreshnessJson || '[]') : [];
+
+  const isApproved = campaign.status === 'STRATEGY_APPROVED' || campaign.status === 'SCHEDULED' || campaign.status === 'ACTIVE';
+
+  const timelineSteps = [
+    { key: 'created', label: 'Campaign Created', status: 'completed' as const },
+    { key: 'strategy', label: 'Strategy Generated', status: strategy ? 'completed' as const : 'current' as const },
+    { key: 'approved', label: 'Strategy Approved', status: isApproved ? 'completed' as const : strategy ? 'current' as const : 'pending' as const },
+    { key: 'planning', label: 'Content Plan & Posts', status: campaign.contentItems?.length > 0 ? 'completed' as const : 'pending' as const },
+    { key: 'scheduled', label: 'Scheduling & Calendar', status: campaign.schedules?.length > 0 ? 'completed' as const : 'pending' as const },
+  ];
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -139,7 +151,7 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 dark:text-white">AI Strategy Workspace</h1>
               <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-                StrategyAgent
+                v{strategy?.version || 1} • {strategy?.status || 'DRAFT'}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Campaign: {campaign.name} • Brand: {campaign.brand?.name}</p>
@@ -148,24 +160,32 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleGenerateStrategy}
-            disabled={rebuildingStrategy}
+            onClick={handleRefreshStrategy}
+            disabled={refreshingStrategy}
             className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${rebuildingStrategy ? 'animate-spin' : ''}`} />
-            <span>Re-Run Strategy Agent</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingStrategy ? 'animate-spin' : ''}`} />
+            <span>Refresh Intelligence</span>
           </button>
 
-          <button
-            onClick={handleGenerateContent}
-            disabled={generatingContent || !strategy}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
-          >
-            <Layers className="w-4 h-4" />
-            <span>{generatingContent ? 'Generating Multimodal Copy...' : 'Generate Multimodal Content'}</span>
-          </button>
+          {!isApproved ? (
+            <button
+              onClick={handleApproveStrategy}
+              disabled={approvingStrategy || !strategy}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm shadow-emerald-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{approvingStrategy ? 'Approving & Planning...' : 'Approve Strategy & Generate Campaign'}</span>
+            </button>
+          ) : (
+            <span className="px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs border border-emerald-500/30 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" /> STRATEGY APPROVED
+            </span>
+          )}
         </div>
       </div>
+
+      <CampaignLifecycleTimeline steps={timelineSteps} />
 
       {!strategy ? (
         <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4 shadow-xs">
@@ -175,8 +195,8 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
             Click below to execute StrategyAgent and assemble grounded content pillars for this campaign.
           </p>
           <button
-            onClick={handleGenerateStrategy}
-            disabled={rebuildingStrategy}
+            onClick={handleRefreshStrategy}
+            disabled={refreshingStrategy}
             className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-sm"
           >
             <Sparkles className="w-4 h-4" /> Execute Strategy Agent
@@ -184,7 +204,39 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
         </div>
       ) : (
         <div className="space-y-6">
-          {/* AI Suggestion Header & Narrative Card */}
+          {/* Data Freshness Metadata Bar */}
+          {sourceFreshness.length > 0 && (
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Data Freshness & Intelligence Inputs
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {sourceFreshness.map((sf: any, idx: number) => (
+                  <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 dark:text-white text-[11px] truncate">{sf.source}</span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          sf.freshness === 'LIVE'
+                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                            : sf.freshness === 'RECENT'
+                            ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                            : sf.freshness === 'CACHED'
+                            ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {sf.freshness}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">{sf.status}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Master Narrative & Override Card */}
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
@@ -294,60 +346,6 @@ export default function CampaignStrategyPage({ params }: { params: { id: string 
                   </p>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Channel Roles Breakdown */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Social Channel Roles & Content Mix
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              {Object.entries(channelRoles).map(([channel, role]) => (
-                <div key={channel} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider block">
-                    {channel}
-                  </span>
-                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">{role as string}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Content Ideas & Grounded Evidence */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Proposed Content Topics ({contentIdeas.length})
-              </h3>
-              <ul className="space-y-2 text-xs">
-                {contentIdeas.map((idea: string, idx: number) => (
-                  <li key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 flex items-center gap-2 font-medium">
-                    <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0">
-                      {idx + 1}
-                    </span>
-                    <span>{idea}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <Database className="w-4 h-4 text-indigo-500" /> Grounded RAG Evidence Cited
-              </h3>
-              {evidence.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4">No explicit RAG citations required for general strategy setup.</p>
-              ) : (
-                <div className="space-y-2 text-xs">
-                  {evidence.map((ev: any, idx: number) => (
-                    <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold block">{ev.filename || 'Brand Knowledge Document'}</span>
-                      <p className="text-slate-800 dark:text-slate-200 font-mono text-[11px]">"{ev.sourceText || ev.excerpt}"</p>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>

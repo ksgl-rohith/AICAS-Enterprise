@@ -8,15 +8,22 @@ import { Badge } from '@/components/ui/badge';
 
 export default function ApprovalsPage() {
   const [items, setItems] = useState<any[]>([]);
+  const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0, revisionRequested: 0, all: 0 });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'pending' | 'all' | 'approved'>('pending');
+  const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [reviewerComment, setReviewerComment] = useState<{ [id: string]: string }>({});
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const fetchItems = () => {
-    fetch('/api/approvals')
+    fetch(`/api/approvals?status=${filter.toUpperCase()}`)
       .then((res) => res.json())
       .then((data) => {
-        setItems(Array.isArray(data) ? data : []);
+        if (data.queue) {
+          setItems(data.queue);
+          if (data.counts) setCounts(data.counts);
+        } else if (Array.isArray(data)) {
+          setItems(data);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -24,38 +31,38 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [filter]);
 
   const handleDecision = async (contentItemId: string, decision: 'APPROVED' | 'REVISION_REQUESTED' | 'REJECTED') => {
+    setProcessingId(contentItemId);
     const comment = reviewerComment[contentItemId] || '';
+    const action = decision === 'APPROVED' ? 'approve' : decision === 'REJECTED' ? 'reject' : 'request_revision';
+
     try {
       const res = await fetch('/api/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentItemId,
+          action,
           decision,
           comment,
         }),
       });
 
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        // Refetch and update state immediately
         fetchItems();
       } else {
-        alert('Failed to record approval decision.');
+        alert(data.error || 'Failed to record approval decision.');
       }
     } catch {
       alert('Error submitting decision.');
+    } finally {
+      setProcessingId(null);
     }
   };
-
-  const filteredItems = items.filter((item) => {
-    if (filter === 'pending') return item.status === 'IN_REVIEW' || item.status === 'NEEDS_REVISION' || item.status === 'DRAFT';
-    if (filter === 'approved') return item.status === 'APPROVED' || item.status === 'SCHEDULED' || item.status === 'PUBLISHED';
-    return true;
-  });
-
-  const pendingCount = items.filter((i) => i.status === 'IN_REVIEW' || i.status === 'NEEDS_REVISION' || i.status === 'DRAFT').length;
 
   return (
     <div className="space-y-6">
@@ -78,17 +85,17 @@ export default function ApprovalsPage() {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Pending ({pendingCount})
+              Pending ({counts.pending})
             </button>
             <button
               onClick={() => setFilter('approved')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 filter === 'approved'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Approved
+              Approved ({counts.approved})
             </button>
             <button
               onClick={() => setFilter('all')}
@@ -98,7 +105,7 @@ export default function ApprovalsPage() {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              All Items ({items.length})
+              All Items ({counts.all})
             </button>
           </div>
         }
@@ -106,29 +113,30 @@ export default function ApprovalsPage() {
 
       {loading ? (
         <div className="text-center py-16 text-slate-500 text-xs font-medium">Loading approval queue...</div>
-      ) : filteredItems.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           icon={CheckCircle2}
           title="Approval Queue is Clear"
-          description="There are no content items matching the current filter criteria."
+          description={`There are currently no items matching the '${filter}' status filter.`}
           action={
             filter !== 'all' ? (
               <button
                 onClick={() => setFilter('all')}
                 className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               >
-                View All Items ({items.length})
+                View All Items ({counts.all})
               </button>
             ) : undefined
           }
         />
       ) : (
         <div className="space-y-6">
-          {filteredItems.map((item) => {
+          {items.map((item) => {
             const review = item.reviewResult;
             const variants = item.variants || [];
             const primaryVariant = variants[0];
             const warnings = review?.warningsJson ? JSON.parse(review.warningsJson) : [];
+            const isApproved = item.status === 'APPROVED' || item.status === 'SCHEDULED' || item.status === 'PUBLISHED';
 
             return (
               <div
@@ -142,7 +150,7 @@ export default function ApprovalsPage() {
                       <h2 className="text-base font-bold text-slate-900 dark:text-white">{item.title}</h2>
                       <Badge
                         variant={
-                          item.status === 'APPROVED'
+                          isApproved
                             ? 'emerald'
                             : item.status === 'NEEDS_REVISION'
                             ? 'amber'
@@ -155,8 +163,8 @@ export default function ApprovalsPage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Campaign: <strong className="text-slate-800 dark:text-slate-200">{item.campaign?.name}</strong> • Brand:{' '}
-                      <strong className="text-slate-800 dark:text-slate-200">{item.campaign?.brand?.name}</strong> • Pillar:{' '}
+                      Campaign: <strong className="text-slate-800 dark:text-slate-200">{item.campaign?.name || 'Campaign'}</strong> • Brand:{' '}
+                      <strong className="text-slate-800 dark:text-slate-200">{item.campaign?.brand?.name || 'Brand'}</strong> • Pillar:{' '}
                       <strong className="text-indigo-600 dark:text-indigo-400">{item.contentPillar}</strong>
                     </p>
                   </div>
@@ -226,7 +234,7 @@ export default function ApprovalsPage() {
                   </div>
                 )}
 
-                {/* Reviewer Comment & Decision Buttons */}
+                {/* Decision Actions */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1">
                     <input
@@ -238,31 +246,43 @@ export default function ApprovalsPage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleDecision(item.id, 'REVISION_REQUESTED')}
-                      className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Request Revision</span>
-                    </button>
+                  {!isApproved ? (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleDecision(item.id, 'REVISION_REQUESTED')}
+                        disabled={processingId === item.id}
+                        className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Request Revision</span>
+                      </button>
 
-                    <button
-                      onClick={() => handleDecision(item.id, 'REJECTED')}
-                      className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-950/60 hover:bg-red-100 dark:hover:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
+                      <button
+                        onClick={() => handleDecision(item.id, 'REJECTED')}
+                        disabled={processingId === item.id}
+                        className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-950/60 hover:bg-red-100 dark:hover:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
 
-                    <button
-                      onClick={() => handleDecision(item.id, 'APPROVED')}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm shadow-emerald-600/30 flex items-center gap-1.5 transition-all"
-                    >
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                      <span>Approve for Schedule</span>
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => handleDecision(item.id, 'APPROVED')}
+                        disabled={processingId === item.id}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm shadow-emerald-600/30 flex items-center gap-1.5 transition-all"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                        <span>{processingId === item.id ? 'Approving...' : 'Approve for Schedule'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Approved & Schedulable</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

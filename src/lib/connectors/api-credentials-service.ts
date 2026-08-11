@@ -355,6 +355,26 @@ export class ApiCredentialsService {
   }
 
   /**
+   * Retrieve effective credential value: DB decrypted value first, process.env fallback second.
+   */
+  public async getEffectiveCredential(
+    category: string,
+    provider: string,
+    keyName: string,
+    envFallbackKey?: string,
+    tenantId: string = 'tenant-default'
+  ): Promise<string | null> {
+    const dbSecrets = await this.getDecryptedSecrets(tenantId, category, provider);
+    if (dbSecrets && dbSecrets[keyName]) {
+      return dbSecrets[keyName];
+    }
+    if (envFallbackKey && process.env[envFallbackKey]) {
+      return process.env[envFallbackKey] || null;
+    }
+    return null;
+  }
+
+  /**
    * Test connection using identity/account endpoint (does NOT create a post!).
    */
   public async testConnection(tenantId: string, category: string, provider: string, userId?: string) {

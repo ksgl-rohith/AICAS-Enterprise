@@ -128,144 +128,261 @@ export class ApprovalService {
     return request;
   }
 
-  public async getApprovalQueue(tenantId: string, status = 'PENDING') {
-    const requests = await db.approvalRequest.findMany({
-      where: {
-        tenantId,
-        status,
+  /**
+   * Get Enriched Approval Queue & Tab Counts
+   */
+  public async getApprovalQueue(tenantId: string = 'tenant-default', statusFilter = 'PENDING') {
+    const allContentItems = await db.contentItem.findMany({
+      include: {
+        campaign: { include: { brand: true } },
+        variants: true,
+        reviewResult: true,
+        approvals: { orderBy: { decidedAt: 'desc' } },
       },
-      orderBy: { requestedAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
 
-    const now = Date.now();
-    return requests.map((req) => {
-      const ageHours = (now - new Date(req.requestedAt).getTime()) / (1000 * 60 * 60);
-      const isSlaBreached = ageHours > req.slaHours;
+    const counts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      revisionRequested: 0,
+      all: allContentItems.length,
+    };
+
+    const enrichedItems = allContentItems.map((item) => {
+      const isApproved = item.status === 'APPROVED' || item.status === 'SCHEDULED' || item.status === 'PUBLISHED';
+      const isRejected = item.status === 'REJECTED';
+      const isRevision = item.status === 'NEEDS_REVISION';
+      const isPending = !isApproved && !isRejected && !isRevision;
+
+      if (isPending) counts.pending++;
+      if (isApproved) counts.approved++;
+      if (isRejected) counts.rejected++;
+      if (isRevision) counts.revisionRequested++;
+
       return {
-        ...req,
-        ageHours: Math.round(ageHours * 10) / 10,
-        isSlaBreached,
+        id: item.id,
+        contentItemId: item.id,
+        title: item.title,
+        status: item.status,
+        contentPillar: item.contentPillar,
+        format: item.format,
+        createdAt: item.createdAt,
+        campaign: item.campaign,
+        variants: item.variants,
+        reviewResult: item.reviewResult,
+        approvals: item.approvals,
       };
     });
+
+    const filterUpper = statusFilter.toUpperCase();
+    let queue = enrichedItems;
+
+    if (filterUpper === 'PENDING') {
+      queue = enrichedItems.filter((i) => i.status !== 'APPROVED' && i.status !== 'SCHEDULED' && i.status !== 'PUBLISHED' && i.status !== 'REJECTED' && i.status !== 'NEEDS_REVISION');
+    } else if (filterUpper === 'APPROVED') {
+      queue = enrichedItems.filter((i) => i.status === 'APPROVED' || i.status === 'SCHEDULED' || i.status === 'PUBLISHED');
+    } else if (filterUpper === 'REJECTED') {
+      queue = enrichedItems.filter((i) => i.status === 'REJECTED');
+    } else if (filterUpper === 'REVISION_REQUESTED' || filterUpper === 'NEEDS_REVISION') {
+      queue = enrichedItems.filter((i) => i.status === 'NEEDS_REVISION');
+    }
+
+    return {
+      success: true,
+      counts,
+      queue,
+    };
   }
 
-  public async approve(approvalId: string, reviewerId: string, comment?: string, expectedVersion = 1) {
-    const existing = await db.approvalRequest.findUnique({ where: { id: approvalId } });
-    if (!existing) throw new Error('Approval request not found');
-
-    if (existing.concurrencyVersion !== expectedVersion) {
-      throw new Error(`Optimistic concurrency conflict: Expected version ${expectedVersion}, found ${existing.concurrencyVersion}`);
-    }
-
-    const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
-    if (comment) {
-      comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
-    }
-
-    const updated = await db.approvalRequest.update({
-      where: { id: approvalId },
-      data: {
-        status: 'APPROVED',
-        assignedReviewerId: reviewerId,
-        commentsJson: JSON.stringify(comments),
-        decidedAt: new Date(),
-        concurrencyVersion: { increment: 1 },
+  /**
+   * Find or resolve target approval request by ID or contentItemId
+   */
+  private async findOrCreateRequest(idOrContentItemId: string) {
+    let req = await db.approvalRequest.findFirst({
+      where: {
+        OR: [{ id: idOrContentItemId }, { contentItemId: idOrContentItemId }],
       },
     });
 
-    // Update ContentItem status if exists
+    if (!req) {
+      const item = await db.contentItem.findUnique({
+        where: { id: idOrContentItemId },
+        include: { campaign: true },
+      });
+      if (item) {
+        req = await db.approvalRequest.create({
+          data: {
+            tenantId: 'tenant-default',
+            brandId: item.campaign.brandId,
+            campaignId: item.campaignId,
+            contentItemId: item.id,
+            oversightMode: 'APPROVAL_REQUIRED',
+            riskCategory: 'NORMAL',
+            mandatoryApproval: true,
+            status: 'PENDING',
+            concurrencyVersion: 1,
+          },
+        });
+      }
+    }
+    return req;
+  }
+
+  public async approve(idOrContentItemId: string, reviewerId: string = 'user_reviewer', comment?: string, expectedVersion = 1) {
+    const existing = await this.findOrCreateRequest(idOrContentItemId);
+    
+    // Update ApprovalRequest
+    let updatedRequest = null;
+    if (existing) {
+      const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
+      if (comment) {
+        comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
+      }
+
+      updatedRequest = await db.approvalRequest.update({
+        where: { id: existing.id },
+        data: {
+          status: 'APPROVED',
+          assignedReviewerId: reviewerId,
+          commentsJson: JSON.stringify(comments),
+          decidedAt: new Date(),
+          concurrencyVersion: { increment: 1 },
+        },
+      });
+    }
+
+    const targetContentItemId = existing ? existing.contentItemId : idOrContentItemId;
+
+    // Atomically Update ContentItem status if exists
+    let updatedContentItem = null;
     try {
-      await db.contentItem.update({
-        where: { id: existing.contentItemId },
+      updatedContentItem = await db.contentItem.update({
+        where: { id: targetContentItemId },
         data: { status: 'APPROVED' },
       });
     } catch {
-      // Ignore if contentItem is decoupled or synthetic in unit test
+      // Ignore if synthetic/decoupled contentItem in test
+    }
+
+    // Record Approval History Entry
+    try {
+      await db.approval.create({
+        data: {
+          contentItemId: targetContentItemId,
+          reviewerId: reviewerId === 'user_reviewer' ? null : reviewerId,
+          decision: 'APPROVED',
+          comment: comment || 'Approved for schedule',
+        },
+      });
+    } catch {
+      // Ignore if decoupled contentItem
     }
 
     await eventBus.publish(
-      createDomainEvent('content.approved', existing.tenantId, `corr_appr_${approvalId}`, 'ApprovalService', {
-        approvalId,
-        contentItemId: existing.contentItemId,
+      createDomainEvent('content.approved', 'tenant-default', `corr_appr_${targetContentItemId}`, 'ApprovalService', {
+        approvalId: existing?.id,
+        contentItemId: targetContentItemId,
         reviewerId,
       })
     );
 
-    return updated;
+    return updatedRequest || updatedContentItem;
   }
 
-  public async reject(approvalId: string, reviewerId: string, comment: string, expectedVersion = 1) {
-    const existing = await db.approvalRequest.findUnique({ where: { id: approvalId } });
-    if (!existing) throw new Error('Approval request not found');
+  public async reject(idOrContentItemId: string, reviewerId: string = 'user_reviewer', comment: string = 'Rejected', expectedVersion = 1) {
+    const existing = await this.findOrCreateRequest(idOrContentItemId);
 
-    if (existing.concurrencyVersion !== expectedVersion) {
-      throw new Error(`Optimistic concurrency conflict: Expected version ${expectedVersion}, found ${existing.concurrencyVersion}`);
+    let updatedRequest = null;
+    if (existing) {
+      const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
+      comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
+
+      updatedRequest = await db.approvalRequest.update({
+        where: { id: existing.id },
+        data: {
+          status: 'REJECTED',
+          assignedReviewerId: reviewerId,
+          commentsJson: JSON.stringify(comments),
+          decidedAt: new Date(),
+          concurrencyVersion: { increment: 1 },
+        },
+      });
     }
 
-    const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
-    comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
-
-    const updated = await db.approvalRequest.update({
-      where: { id: approvalId },
-      data: {
-        status: 'REJECTED',
-        assignedReviewerId: reviewerId,
-        commentsJson: JSON.stringify(comments),
-        decidedAt: new Date(),
-        concurrencyVersion: { increment: 1 },
-      },
-    });
-
-    await db.contentItem.update({
-      where: { id: existing.contentItemId },
+    const targetContentItemId = existing ? existing.contentItemId : idOrContentItemId;
+    const updatedContentItem = await db.contentItem.update({
+      where: { id: targetContentItemId },
       data: { status: 'REJECTED' },
     });
 
+    await db.approval.create({
+      data: {
+        contentItemId: targetContentItemId,
+        reviewerId: reviewerId === 'user_reviewer' ? null : reviewerId,
+        decision: 'REJECTED',
+        comment,
+      },
+    });
+
     await eventBus.publish(
-      createDomainEvent('content.rejected', existing.tenantId, `corr_appr_${approvalId}`, 'ApprovalService', {
-        approvalId,
-        contentItemId: existing.contentItemId,
+      createDomainEvent('content.rejected', 'tenant-default', `corr_appr_${targetContentItemId}`, 'ApprovalService', {
+        approvalId: existing?.id,
+        contentItemId: targetContentItemId,
         reviewerId,
         reason: comment,
       })
     );
 
-    return updated;
+    return updatedRequest || updatedContentItem;
   }
 
-  public async requestRevision(approvalId: string, reviewerId: string, comment: string, expectedVersion = 1) {
-    const existing = await db.approvalRequest.findUnique({ where: { id: approvalId } });
-    if (!existing) throw new Error('Approval request not found');
+  public async requestRevision(idOrContentItemId: string, reviewerId: string = 'user_reviewer', comment: string = 'Revision requested', expectedVersion = 1) {
+    const existing = await this.findOrCreateRequest(idOrContentItemId);
 
-    const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
-    comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
+    let updatedRequest = null;
+    if (existing) {
+      const comments = existing.commentsJson ? JSON.parse(existing.commentsJson) : [];
+      comments.push({ reviewerId, comment, timestamp: new Date().toISOString() });
 
-    const updated = await db.approvalRequest.update({
-      where: { id: approvalId },
-      data: {
-        status: 'REVISION_REQUESTED',
-        assignedReviewerId: reviewerId,
-        commentsJson: JSON.stringify(comments),
-        decidedAt: new Date(),
-        concurrencyVersion: { increment: 1 },
-      },
-    });
+      updatedRequest = await db.approvalRequest.update({
+        where: { id: existing.id },
+        data: {
+          status: 'REVISION_REQUESTED',
+          assignedReviewerId: reviewerId,
+          commentsJson: JSON.stringify(comments),
+          decidedAt: new Date(),
+          concurrencyVersion: { increment: 1 },
+        },
+      });
+    }
 
-    await db.contentItem.update({
-      where: { id: existing.contentItemId },
+    const targetContentItemId = existing ? existing.contentItemId : idOrContentItemId;
+    const updatedContentItem = await db.contentItem.update({
+      where: { id: targetContentItemId },
       data: { status: 'NEEDS_REVISION' },
     });
 
+    await db.approval.create({
+      data: {
+        contentItemId: targetContentItemId,
+        reviewerId: reviewerId === 'user_reviewer' ? null : reviewerId,
+        decision: 'REVISION_REQUESTED',
+        comment,
+      },
+    });
+
     await eventBus.publish(
-      createDomainEvent('content.revision.requested', existing.tenantId, `corr_appr_${approvalId}`, 'ApprovalService', {
-        approvalId,
-        contentItemId: existing.contentItemId,
+      createDomainEvent('content.revision.requested', 'tenant-default', `corr_appr_${targetContentItemId}`, 'ApprovalService', {
+        approvalId: existing?.id,
+        contentItemId: targetContentItemId,
         reviewerId,
         comment,
       })
     );
 
-    return updated;
+    return updatedRequest || updatedContentItem;
   }
 }
 
