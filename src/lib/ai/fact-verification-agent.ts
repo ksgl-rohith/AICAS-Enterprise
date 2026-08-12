@@ -42,6 +42,7 @@ export const FactVerificationOutputSchema = z.object({
   factualRiskScore: z.number().min(0).max(100),
   hasUnsupportedHighRiskClaim: z.boolean(),
   status: z.enum(['passed', 'needs_revision', 'blocked']),
+  rationale: z.string().optional(),
 });
 
 export type FactVerificationOutput = z.infer<typeof FactVerificationOutputSchema>;
@@ -86,7 +87,7 @@ export function extractAndVerifyClaims(
       return matchCount >= 2;
     });
 
-    let classification: ClaimClassification = 'unverified' as any;
+    let classification: ClaimClassification = 'unverifiable';
     let confidence = 0.5;
     let correctedWording: string | undefined = undefined;
 
@@ -133,14 +134,21 @@ export class FactVerificationAgent {
       (c) => c.isHighRisk && (c.classification === 'unsupported' || c.classification === 'contradictory')
     );
 
-    const supportedCount = claims.filter((c) => c.classification === 'supported').length;
-    const overallFactualConfidence = claims.length > 0
-      ? Math.round((supportedCount / claims.length) * 100) / 100
-      : 1.0;
+    const nonOpinionClaims = claims.filter((c) => c.claimType !== 'opinion_or_marketing');
+    const hasMaterialClaims = nonOpinionClaims.length > 0;
 
-    const factualRiskScore = highRiskUnsupported
-      ? 85
-      : Math.round((1 - overallFactualConfidence) * 100);
+    let factualRiskScore = 0;
+    let overallFactualConfidence = 1.0;
+    let rationale = 'No material factual claims detected.';
+
+    if (hasMaterialClaims) {
+      const supportedCount = nonOpinionClaims.filter((c) => c.classification === 'supported').length;
+      overallFactualConfidence = Math.round((supportedCount / nonOpinionClaims.length) * 100) / 100;
+      factualRiskScore = highRiskUnsupported
+        ? 85
+        : Math.round((1 - overallFactualConfidence) * 100);
+      rationale = `${nonOpinionClaims.length} factual claims extracted. ${supportedCount} supported by verified evidence.`;
+    }
 
     const status: 'passed' | 'needs_revision' | 'blocked' = highRiskUnsupported ? 'blocked' : factualRiskScore > 30 ? 'needs_revision' : 'passed';
 
@@ -151,6 +159,7 @@ export class FactVerificationAgent {
       factualRiskScore,
       hasUnsupportedHighRiskClaim: highRiskUnsupported,
       status,
+      rationale,
     };
 
     return {

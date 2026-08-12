@@ -24,7 +24,7 @@ export type ComplianceViolation = z.infer<typeof ComplianceViolationSchema>;
 
 export const ComplianceInputSchema = z.object({
   contentItemId: z.string(),
-  channel: z.enum(['linkedin', 'facebook', 'instagram', 'telegram']),
+  channel: z.string(),
   text: z.string(),
   prohibitedPhrases: z.array(z.string()).default([]),
   requiredDisclaimers: z.array(z.string()).default([]),
@@ -91,7 +91,7 @@ export function runDeterministicComplianceChecks(
   }
 
   // 3. Secret leak check (API keys, tokens, secret passwords)
-  const secretRegex = /(?:sk-[a-zA-Z0-9]{32,}|AIzaSy[a-zA-Z0-9_-]{33}|ghp_[a-zA-Z0-9]{36}|bearer\s+[a-zA-Z0-9\._-]{20,})/i;
+  const secretRegex = /(?:sk-[a-zA-Z0-9_-]{20,}|AIzaSy[a-zA-Z0-9_-]{33}|ghp_[a-zA-Z0-9]{36}|bearer\s+[a-zA-Z0-9\._-]{20,})/i;
   const secretMatch = text.match(secretRegex);
   if (secretMatch) {
     hardBlock = true;
@@ -127,6 +127,13 @@ export function runDeterministicComplianceChecks(
     facebook: 5000,
     instagram: 2200,
     telegram: 4096,
+    x: 280,
+    threads: 500,
+    youtube: 5000,
+    pinterest: 500,
+    quora: 10000,
+    wordpress: 50000,
+    website: 50000,
   };
 
   const limit = platformLimits[channel] || 3000;

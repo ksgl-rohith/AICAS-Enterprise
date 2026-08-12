@@ -1,12 +1,14 @@
+import { cmsWebhookConnector } from './cms-webhook-connector';
 import { facebookConnector } from './facebook-connector';
 import { instagramConnector } from './instagram-connector';
 import { linkedinConnector } from './linkedin-connector';
 import { simulatedConnector } from './simulated-connector';
 import { telegramConnector } from './telegram-connector';
 import { PublishRequest, PublishResult, SocialConnector } from './types';
+import { wordPressConnector } from './wordpress-connector';
 
 export class PublishingRouter {
-  public getConnector(channel: 'linkedin' | 'facebook' | 'instagram' | 'telegram' | 'simulated'): SocialConnector {
+  public getConnector(channel: PublishRequest['channel']): SocialConnector {
     switch (channel) {
       case 'linkedin':
         return linkedinConnector;
@@ -16,6 +18,10 @@ export class PublishingRouter {
         return instagramConnector;
       case 'telegram':
         return telegramConnector;
+      case 'wordpress':
+        return wordPressConnector;
+      case 'website':
+        return cmsWebhookConnector;
       default:
         return simulatedConnector;
     }

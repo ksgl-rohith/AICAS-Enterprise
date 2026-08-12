@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { connectorCapabilityRegistry, CONNECTOR_CAPABILITIES } from '@/lib/connectors/connector-capability-registry';
 
 describe('Connector Capability Registry', () => {
-  it('registers capabilities for 12 social, video, messaging, and CMS platforms', () => {
+  it('registers capabilities for 13 social, video, messaging, and CMS platforms', () => {
     const all = connectorCapabilityRegistry.getAllCapabilities();
-    expect(all.length).toBe(12);
+    expect(all.length).toBe(13);
   });
 
   it('correctly maps status AVAILABLE, BETA, API_APPROVAL_REQUIRED, and EXPORT_ONLY', () => {

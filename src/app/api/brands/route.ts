@@ -1,9 +1,12 @@
+import { brandDeduplicationService } from '@/lib/brand/brand-deduplication-service';
+import { DomainNormalizer } from '@/lib/brand/domain-normalizer';
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     const brands = await db.brand.findMany({
+      where: { isArchived: false },
       include: {
         _count: {
           select: {
@@ -30,6 +33,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No user found' }, { status: 400 });
     }
 
+    const websiteUrl = body.websiteUrl || body.originalWebsiteUrl || null;
+    const normalized = DomainNormalizer.normalize(websiteUrl);
+
+    // 1. Run Duplicate Detection
+    const dupCheck = await brandDeduplicationService.detectDuplicate('tenant-default', body.name, websiteUrl);
+    if (dupCheck.matchType === 'EXACT_DUPLICATE') {
+      return NextResponse.json(
+        {
+          error: `A Brand Profile already exists for this website (${dupCheck.existingBrand?.name}). Duplicate profile creation blocked.`,
+          isDuplicate: true,
+          matchType: dupCheck.matchType,
+          existingBrandId: dupCheck.existingBrand?.id,
+          existingBrandName: dupCheck.existingBrand?.name,
+        },
+        { status: 409 }
+      );
+    }
+
     const brand = await db.brand.create({
       data: {
         userId: user.id,
@@ -48,6 +69,9 @@ export async function POST(req: Request) {
         language: body.language || 'en-US',
         brandColors: body.brandColors || '#6366f1,#4f46e5',
         competitors: body.competitors || '',
+        originalWebsiteUrl: normalized?.originalWebsiteUrl || websiteUrl,
+        canonicalWebsiteUrl: normalized?.canonicalWebsiteUrl || null,
+        normalizedDomain: normalized?.normalizedDomain || null,
       },
     });
 
@@ -56,13 +80,19 @@ export async function POST(req: Request) {
         userId: user.id,
         brandId: brand.id,
         action: 'BRAND_CREATED',
-        details: `Brand "${brand.name}" created.`,
+        details: `Brand "${brand.name}" created (${brand.normalizedDomain || 'no domain'}).`,
         entityType: 'Brand',
         entityId: brand.id,
       },
     });
 
-    return NextResponse.json(brand, { status: 201 });
+    return NextResponse.json(
+      {
+        ...brand,
+        probableDuplicateWarning: dupCheck.matchType === 'PROBABLE_DUPLICATE' ? dupCheck.rationale : undefined,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

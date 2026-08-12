@@ -9,6 +9,7 @@ export type PlatformId =
   | 'telegram'
   | 'pinterest'
   | 'reddit'
+  | 'quora'
   | 'wordpress'
   | 'website';
 
@@ -26,7 +27,7 @@ export interface ConnectorCapability {
   platform: PlatformId;
   name: string;
   group: IntegrationGroup;
-  authenticationType: 'oauth2' | 'bot_token' | 'api_key' | 'webhook';
+  authenticationType: 'oauth2' | 'bot_token' | 'api_key' | 'webhook' | 'manual_export';
   publishing: boolean;
   analytics: boolean;
   mediaUpload: boolean;
@@ -199,6 +200,22 @@ export const CONNECTOR_CAPABILITIES: Record<PlatformId, ConnectorCapability> = {
     scheduling: false,
     status: 'API_APPROVAL_REQUIRED',
     description: 'Subreddit discussion monitoring and compliance-restricted post export.',
+  },
+  quora: {
+    platform: 'quora',
+    name: 'Quora Answers & Posts',
+    group: 'Discovery & Community',
+    authenticationType: 'manual_export',
+    publishing: false,
+    analytics: false,
+    mediaUpload: true,
+    videoUpload: false,
+    carousel: false,
+    comments: false,
+    accountDiscovery: false,
+    scheduling: false,
+    status: 'EXPORT_ONLY',
+    description: 'Assisted publishing package generation for Quora answers and posts with formatted copy, evidence citations, and media links.',
   },
   wordpress: {
     platform: 'wordpress',

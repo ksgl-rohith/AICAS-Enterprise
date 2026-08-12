@@ -10,7 +10,20 @@ export interface ConnectionResult {
 export interface PublishRequest {
   publicationId: string;
   brandId: string;
-  channel: 'linkedin' | 'facebook' | 'instagram' | 'telegram';
+  channel:
+    | 'linkedin'
+    | 'facebook'
+    | 'instagram'
+    | 'telegram'
+    | 'x'
+    | 'threads'
+    | 'youtube'
+    | 'pinterest'
+    | 'reddit'
+    | 'quora'
+    | 'wordpress'
+    | 'website'
+    | 'simulated';
   headline?: string;
   hook: string;
   bodyText: string;
@@ -18,6 +31,7 @@ export interface PublishRequest {
   hashtags?: string[];
   altText?: string;
   imageUrl?: string;
+  videoUrl?: string;
   isScheduled?: boolean;
   idempotencyKey: string;
 }
@@ -42,7 +56,20 @@ export interface PlatformMetrics {
 }
 
 export interface SocialConnector {
-  platform: 'linkedin' | 'facebook' | 'instagram' | 'telegram' | 'simulated';
+  platform:
+    | 'linkedin'
+    | 'facebook'
+    | 'instagram'
+    | 'telegram'
+    | 'x'
+    | 'threads'
+    | 'youtube'
+    | 'pinterest'
+    | 'reddit'
+    | 'quora'
+    | 'wordpress'
+    | 'website'
+    | 'simulated';
   isConfigured(brandId: string): Promise<boolean>;
   testConnection(brandId: string): Promise<ConnectionResult>;
   publish(request: PublishRequest): Promise<PublishResult>;

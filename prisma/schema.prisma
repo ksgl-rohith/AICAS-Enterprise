@@ -75,6 +75,10 @@ model Brand {
   language            String   @default("en-US")
   brandColors         String   @default("#6366f1,#4f46e5")
   competitors         String?
+  originalWebsiteUrl  String?
+  canonicalWebsiteUrl String?
+  normalizedDomain    String?
+  isArchived          Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -238,12 +242,19 @@ model ReviewResult {
   readabilityScore     Int         // 0 - 100
   overallStatus        String      // 'passed', 'needs_revision', 'blocked'
   confidence           Float       @default(0.95)
+  freshnessStatus      String      @default("CURRENT") // 'CURRENT', 'STALE', 'EVALUATING', 'FAILED'
+  brandPolicyVersion   String      @default("v1.0")
+  evaluatorVersion     String      @default("v1.0")
+  dimensionScoresJson  String?     // JSON breakdown of 8 brand dimensions & claim verification
+  claimsJson           String?     // JSON array of extracted claims & verification status
+  evidenceCoverage     Float       @default(1.0)
   warningsJson         String      // JSON array of warning strings
   correctionsJson      String?     // JSON array of correction objects
   evidenceRefsJson     String?     // JSON array of evidence refs
   prohibitedTermsFound String?     // Comma separated
   missingDisclaimers   String?     // Comma separated
   duplicateSimilarity  Float       @default(0.0)
+  evaluatedAt          DateTime    @default(now())
   reviewedAt           DateTime    @default(now())
 }
 
@@ -739,5 +750,19 @@ model CreativeFatigueRecord {
   explanation    String
   detectedAt     DateTime @default(now())
 }
+
+model BrandMergeRecord {
+  id                 String   @id @default(cuid())
+  tenantId           String   @default("tenant-default")
+  canonicalBrandId   String
+  mergedBrandId      String
+  mergedBrandName    String
+  mergedDomain       String?
+  reason             String
+  migratedCountsJson String   // JSON object detailing counts of migrated entities
+  mergedBy           String   @default("system")
+  mergedAt           DateTime @default(now())
+}
+
 
 

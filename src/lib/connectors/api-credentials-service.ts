@@ -331,6 +331,27 @@ export class ApiCredentialsService {
   }
 
   /**
+   * Retrieve single decrypted credential record by provider.
+   */
+  public async getCredential(tenantId: string = 'tenant-default', category: string, provider: string) {
+    const dbSecrets = await this.getDecryptedSecrets(tenantId, category, provider);
+    const cred = await db.apiCredential.findUnique({
+      where: {
+        tenantId_category_provider: {
+          tenantId,
+          category,
+          provider,
+        },
+      },
+    });
+    if (!cred) return null;
+    return {
+      ...cred,
+      decryptedPayload: dbSecrets || {},
+    };
+  }
+
+  /**
    * Retrieve decrypted secrets on server side ONLY for internal service callers.
    */
   public async getDecryptedSecrets(tenantId: string, category: string, provider: string): Promise<Record<string, string> | null> {

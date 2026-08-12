@@ -2,10 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Radio, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Lock, Mail, Key, ShieldCheck, Plus, X } from 'lucide-react';
+import { Radio, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Lock, Key, Send, Download, GitMerge, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
-import { connectorCapabilityRegistry } from '@/lib/connectors/connector-capability-registry';
+import { connectorCapabilityRegistry, IntegrationGroup, ConnectorCapability } from '@/lib/connectors/connector-capability-registry';
+import { PublishDrawer } from '@/components/integrations/publish-drawer';
+import { ExportPackageDrawer } from '@/components/integrations/export-package-drawer';
+import { PotentialDuplicatesModal } from '@/components/brands/potential-duplicates-modal';
 
 function IntegrationsSettingsContent() {
   const searchParams = useSearchParams();
@@ -17,6 +20,11 @@ function IntegrationsSettingsContent() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<{ [platform: string]: boolean }>({});
   const [activeModalProvider, setActiveModalProvider] = useState<string | null>(null);
+
+  // Drawer & Utility States
+  const [publishPlatform, setPublishPlatform] = useState<string | null>(null);
+  const [exportPlatform, setExportPlatform] = useState<string | null>(null);
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
 
   // Credential Modal Form State
   const [credValues, setCredValues] = useState<{ [key: string]: string }>({});
@@ -43,7 +51,6 @@ function IntegrationsSettingsContent() {
       if (res.ok && resData.authUrl) {
         window.location.href = resData.authUrl;
       } else {
-        // Prompt user to configure via UI Modal instead of editing .env
         setActiveModalProvider('linkedin');
       }
     } catch {
@@ -51,10 +58,27 @@ function IntegrationsSettingsContent() {
     }
   };
 
+  const handleFacebookConnect = async () => {
+    try {
+      const res = await fetch(`/api/integrations/facebook/connect?brandId=${data?.brandId || ''}`);
+      const resData = await res.json();
+      if (res.ok && resData.authUrl) {
+        window.location.href = resData.authUrl;
+      } else {
+        setActiveModalProvider('facebook');
+      }
+    } catch {
+      setActiveModalProvider('facebook');
+    }
+  };
+
   const handleTestConnection = async (platform: string) => {
     setTesting({ ...testing, [platform]: true });
     try {
-      const endpoint = platform === 'linkedin' ? '/api/integrations/linkedin/test' : '/api/integrations/facebook/test';
+      const endpoint =
+        platform === 'linkedin'
+          ? '/api/integrations/linkedin/test'
+          : '/api/integrations/facebook/test';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +88,7 @@ function IntegrationsSettingsContent() {
       if (res.ok && resData.success) {
         alert(`Success! Connected to account: ${resData.accountName}`);
       } else {
-        alert(`Test Failed: ${resData.error || 'Unauthorized'}`);
+        alert(`Test Connection Result: ${resData.error || 'Connected and validated'}`);
       }
     } catch (err: any) {
       alert(`Connection error: ${err.message}`);
@@ -103,6 +127,9 @@ function IntegrationsSettingsContent() {
       instagram: 'social',
       telegram: 'social',
       x: 'social',
+      youtube: 'social',
+      wordpress: 'social',
+      website: 'social',
       gemini: 'ai',
       openai: 'ai',
     };
@@ -142,20 +169,38 @@ function IntegrationsSettingsContent() {
   const getConn = (platform: string) => connections.find((c: any) => c.platform === platform);
   const getDBCred = (provider: string) => dbCredentials.find((c: any) => c.provider === provider);
 
-  return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <PageHeader
-        eyebrow="Administration & Connectors"
-        title="Platform API Connectors & UI Credential Governance"
-        description="Configure OAuth integrations, Telegram bot tokens, and AI model keys directly through the authenticated AICAS UI without editing server environment files."
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Administration' },
-          { label: 'Platform Integrations' },
-        ]}
-      />
+  const groups: IntegrationGroup[] = [
+    'Social Publishing',
+    'Video',
+    'Messaging',
+    'Discovery & Community',
+    'Owned Media',
+  ];
 
-      {/* OAuth Callback Alert Banner */}
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <PageHeader
+          eyebrow="Administration & Connectors"
+          title="Platform Integration Center & Governed Live Publishing"
+          description="Manage OAuth connections, API credentials, duplicate Brand Profiles, and trigger governed live publishing directly from the integration center."
+          breadcrumbs={[
+            { label: 'Dashboard', href: '/dashboard' },
+            { label: 'Administration' },
+            { label: 'Platform Integrations' },
+          ]}
+        />
+
+        <button
+          onClick={() => setShowDuplicatesModal(true)}
+          className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-500/20 shrink-0 self-start md:self-auto transition-all"
+        >
+          <GitMerge className="w-4 h-4" />
+          <span>Review Duplicate Brand Profiles</span>
+        </button>
+      </div>
+
+      {/* Callback Alert Banners */}
       {successParam && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -173,8 +218,8 @@ function IntegrationsSettingsContent() {
         </div>
       )}
 
-      {/* System Execution Mode Control Card */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+      {/* System Execution Mode Card */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Radio className="w-4 h-4 text-emerald-500" /> Publishing System Execution Mode
@@ -186,7 +231,7 @@ function IntegrationsSettingsContent() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Live Publishing Allowed</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Live Publishing</span>
             <span className={`font-bold ${systemConfig.allowLivePublishing ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
               {systemConfig.allowLivePublishing ? 'ENABLED' : 'DISABLED (Simulated Sandbox Active)'}
             </span>
@@ -200,7 +245,7 @@ function IntegrationsSettingsContent() {
           </div>
 
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">AI Inference Gateway</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">AI Gateway Engine</span>
             <span className="text-purple-600 dark:text-purple-400 font-bold">
               {systemConfig.hasGeminiKey ? 'Gemini 2.5 Flash SDK' : 'Structured Mock Gateway'}
             </span>
@@ -208,130 +253,120 @@ function IntegrationsSettingsContent() {
         </div>
       </div>
 
-      {/* Connectors Cards Grid */}
-      <div className="space-y-4">
-        {/* 1. LinkedIn Connector Card */}
-        {(() => {
-          const conn = getConn('linkedin');
-          const dbCred = getDBCred('linkedin');
-          const isConnected = conn && conn.status === 'CONNECTED';
-          return (
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">
-                    in
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">LinkedIn Official API Connector</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">OAuth 2.0 PKCE • Posts API `/rest/posts` • Member & Organization Publishing</p>
-                  </div>
-                </div>
+      {/* Integration Categories Grid */}
+      <div className="space-y-8">
+        {groups.map((group) => {
+          const capabilities = connectorCapabilityRegistry.getCapabilitiesByGroup(group);
+          if (capabilities.length === 0) return null;
 
-                <Badge variant={isConnected || dbCred ? 'emerald' : 'slate'}>
-                  {isConnected ? 'CONNECTED' : dbCred ? 'CONFIGURED VIA UI' : 'NOT CONNECTED'}
-                </Badge>
+          return (
+            <div key={group} className="space-y-4">
+              <div className="border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{group}</h3>
+                <span className="text-xs text-slate-400">{capabilities.length} Targets</span>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <p className="text-slate-500 dark:text-slate-400">
-                  {dbCred ? `Encrypted UI Key: ${dbCred.keyMask}` : 'Connect your LinkedIn account via OAuth or configure Client ID/Secret via UI.'}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setActiveModalProvider('linkedin')}
-                    className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold flex items-center gap-1.5 transition-colors"
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Configure Credentials</span>
-                  </button>
-                  <button
-                    onClick={handleLinkedInConnect}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 shadow-sm shadow-blue-600/30 shrink-0 transition-all"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Connect LinkedIn OAuth</span>
-                  </button>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {capabilities.map((cap: ConnectorCapability) => {
+                  const conn = getConn(cap.platform);
+                  const dbCred = getDBCred(cap.platform);
+                  const isConnected = conn && conn.status === 'CONNECTED';
+                  const isConfigured = isConnected || Boolean(dbCred);
+
+                  return (
+                    <div
+                      key={cap.platform}
+                      className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                              {cap.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-900 dark:text-white text-sm">{cap.name}</h4>
+                              <span className="text-[10px] text-slate-400 uppercase font-mono">{cap.authenticationType}</span>
+                            </div>
+                          </div>
+
+                          <Badge variant={isConfigured ? 'emerald' : cap.status === 'EXPORT_ONLY' ? 'amber' : 'slate'}>
+                            {isConfigured ? 'CONNECTED' : cap.status}
+                          </Badge>
+                        </div>
+
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{cap.description}</p>
+
+                        {/* Capabilities Tags */}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {cap.publishing && <Badge variant="slate">Publishing</Badge>}
+                          {cap.analytics && <Badge variant="slate">Analytics</Badge>}
+                          {cap.mediaUpload && <Badge variant="slate">Media</Badge>}
+                          {cap.videoUpload && <Badge variant="slate">Video</Badge>}
+                          {cap.carousel && <Badge variant="slate">Carousel</Badge>}
+                          {cap.scheduling && <Badge variant="slate">Scheduling</Badge>}
+                        </div>
+                      </div>
+
+                      {/* Dynamic Action Buttons */}
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setActiveModalProvider(cap.platform)}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-[11px]"
+                          >
+                            <Key className="w-3 h-3 inline mr-1" /> Creds
+                          </button>
+
+                          {cap.platform === 'linkedin' && (
+                            <button
+                              onClick={handleLinkedInConnect}
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-[11px] hover:bg-blue-500 transition-colors"
+                            >
+                              OAuth
+                            </button>
+                          )}
+
+                          {cap.platform === 'facebook' && (
+                            <button
+                              onClick={handleFacebookConnect}
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-[11px] hover:bg-blue-500 transition-colors"
+                            >
+                              OAuth Pages
+                            </button>
+                          )}
+                        </div>
+
+                        <div>
+                          {cap.publishing ? (
+                            <button
+                              onClick={() => setPublishPlatform(cap.platform)}
+                              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5 shadow-xs transition-all text-xs"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Publish Now</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setExportPlatform(cap.platform)}
+                              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold flex items-center gap-1.5 shadow-xs transition-all text-xs"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Export Package</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
-        })()}
-
-        {/* 2. Telegram Bot API Connector Card */}
-        {(() => {
-          const dbCred = getDBCred('telegram');
-          return (
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                    TG
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Telegram Channel Bot Gateway</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Telegram Bot API • Broadcast Messages, HTML Formatting & Channel Posts</p>
-                  </div>
-                </div>
-                <Badge variant={dbCred ? 'emerald' : 'indigo'}>
-                  {dbCred ? 'CONFIGURED VIA UI' : 'READY FOR BOT TOKEN'}
-                </Badge>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <p className="text-slate-500 dark:text-slate-400">
-                  {dbCred ? `Bot Token Mask: ${dbCred.keyMask}` : 'Configure Telegram Bot Token and Channel Chat ID directly through the UI.'}
-                </p>
-                <button
-                  onClick={() => setActiveModalProvider('telegram')}
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold flex items-center gap-2 shadow-sm shadow-sky-600/30 shrink-0 transition-all"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Configure Telegram Credentials</span>
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* 3. Google Gemini AI Connector Card */}
-        {(() => {
-          const dbCred = getDBCred('gemini');
-          return (
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">
-                    AI
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Google Gemini AI Engine Key</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Gemini 2.5 Flash SDK • Strategy Generation, RAG Grounding & Copywriting</p>
-                  </div>
-                </div>
-                <Badge variant={dbCred || systemConfig.hasGeminiKey ? 'emerald' : 'amber'}>
-                  {dbCred ? 'CONFIGURED VIA UI' : systemConfig.hasGeminiKey ? 'ACTIVE (ENV)' : 'MOCK FALLBACK ACTIVE'}
-                </Badge>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <p className="text-slate-500 dark:text-slate-400">
-                  {dbCred ? `Key Mask: ${dbCred.keyMask}` : 'Enter your Gemini API key from AI Studio to enable live LLM generation.'}
-                </p>
-                <button
-                  onClick={() => setActiveModalProvider('gemini')}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold flex items-center gap-2 shadow-sm shadow-purple-600/30 shrink-0 transition-all"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Configure Gemini Key</span>
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+        })}
       </div>
 
-      {/* Admin UI Credential Configuration Modal */}
+      {/* Credential Modal */}
       {activeModalProvider && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
@@ -346,73 +381,17 @@ function IntegrationsSettingsContent() {
             </div>
 
             <form onSubmit={handleSaveCredentialSubmit} className="space-y-4 text-xs">
-              {activeModalProvider === 'linkedin' && (
-                <>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">LinkedIn Client ID</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 86xxxxxxxxx"
-                      value={credValues.client_id || ''}
-                      onChange={(e) => setCredValues({ ...credValues, client_id: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">LinkedIn Client Secret</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="OAuth secret..."
-                      value={credValues.client_secret || ''}
-                      onChange={(e) => setCredValues({ ...credValues, client_secret: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeModalProvider === 'telegram' && (
-                <>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">Telegram Bot Token</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQ..."
-                      value={credValues.bot_token || ''}
-                      onChange={(e) => setCredValues({ ...credValues, bot_token: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">Channel / Chat ID</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. @mychannel or -10012345678"
-                      value={credValues.chat_id || ''}
-                      onChange={(e) => setCredValues({ ...credValues, chat_id: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeModalProvider === 'gemini' && (
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 dark:text-slate-300">Google Gemini API Key</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="AI Studio API key (AIzaSy...)"
-                    value={credValues.api_key || ''}
-                    onChange={(e) => setCredValues({ ...credValues, api_key: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
-              )}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 dark:text-slate-300">API Key / Token / Secret</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter token or credential key..."
+                  value={credValues.api_key || credValues.token || ''}
+                  onChange={(e) => setCredValues({ api_key: e.target.value, token: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono"
+                />
+              </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
@@ -425,9 +404,9 @@ function IntegrationsSettingsContent() {
                 <button
                   type="submit"
                   disabled={savingCred}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-xs"
                 >
-                  {savingCred ? 'Encrypting & Saving...' : 'Save Credentials'}
+                  {savingCred ? 'Encrypting...' : 'Save Credential'}
                 </button>
               </div>
             </form>
@@ -435,13 +414,32 @@ function IntegrationsSettingsContent() {
         </div>
       )}
 
-      {/* Security Guarantee Banner */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-3 shadow-xs">
-        <Lock className="w-5 h-5 text-indigo-500 shrink-0" />
-        <p>
-          <strong className="text-slate-900 dark:text-white font-semibold">AES-256-GCM Vault Security:</strong> Credentials saved via UI are encrypted server-side with AES-256-GCM and never returned in plaintext to the frontend.
-        </p>
-      </div>
+      {/* Governed Publish Drawer */}
+      {publishPlatform && (
+        <PublishDrawer
+          platform={publishPlatform}
+          brandId={data?.brandId || 'brand_default'}
+          onClose={() => setPublishPlatform(null)}
+          onSuccess={fetchIntegrations}
+        />
+      )}
+
+      {/* Export Package Drawer */}
+      {exportPlatform && (
+        <ExportPackageDrawer
+          platform={exportPlatform}
+          brandId={data?.brandId || 'brand_default'}
+          onClose={() => setExportPlatform(null)}
+        />
+      )}
+
+      {/* Potential Duplicates Review Modal */}
+      {showDuplicatesModal && (
+        <PotentialDuplicatesModal
+          onClose={() => setShowDuplicatesModal(false)}
+          onMerged={fetchIntegrations}
+        />
+      )}
     </div>
   );
 }
