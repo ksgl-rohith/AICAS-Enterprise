@@ -4,21 +4,10 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function getDatabaseUrl(): string {
-  const envUrl = process.env.DATABASE_URL;
-  if (envUrl && envUrl.startsWith('file:')) {
-    return envUrl;
-  }
-  return 'file:./dev.db';
-}
-
 function createPrismaClient(): PrismaClient {
+  const dbUrl = process.env.DATABASE_URL;
   return new PrismaClient({
-    datasources: {
-      db: {
-        url: getDatabaseUrl(),
-      },
-    },
+    ...(dbUrl ? { datasources: { db: { url: dbUrl } } } : {}),
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 }

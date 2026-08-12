@@ -77,7 +77,7 @@ export class GovernedPublisherService {
     let qualityRefreshed = false;
 
     // Rerun review if missing or marked STALE
-    if (!reviewResult || reviewResult.freshnessStatus === 'STALE') {
+    if (!reviewResult || (reviewResult as any).freshnessStatus === 'STALE') {
       const reviewRes = await reviewAgent.execute({
         taskId: `pre_publish_refresh_${Date.now()}`,
         tenantId: 'tenant-default',

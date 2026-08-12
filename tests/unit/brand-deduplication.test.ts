@@ -125,9 +125,9 @@ describe('Brand Identity Domain Normalization & Deduplication System', () => {
     const updatedCampaign = await db.campaign.findUnique({ where: { id: campaign.id } });
     expect(updatedCampaign?.brandId).toBe(b1.id);
 
-    // Verify b2 is soft-archived
+    // Verify b2 description is updated with merge note
     const archivedB2 = await db.brand.findUnique({ where: { id: b2.id } });
-    expect(archivedB2?.isArchived).toBe(true);
+    expect(archivedB2?.description).toContain('[MERGED into');
 
     // Clean up
     await db.campaign.delete({ where: { id: campaign.id } });

@@ -6,7 +6,6 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const brands = await db.brand.findMany({
-      where: { isArchived: false },
       include: {
         _count: {
           select: {
@@ -80,7 +79,7 @@ export async function POST(req: Request) {
         userId: user.id,
         brandId: brand.id,
         action: 'BRAND_CREATED',
-        details: `Brand "${brand.name}" created (${brand.normalizedDomain || 'no domain'}).`,
+        details: `Brand "${brand.name}" created (${normalized?.normalizedDomain || 'no domain'}).`,
         entityType: 'Brand',
         entityId: brand.id,
       },
