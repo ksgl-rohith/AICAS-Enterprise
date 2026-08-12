@@ -53,6 +53,7 @@ export const TrendIntelligenceOutputSchema = z.object({
   signalsProcessed: z.number(),
   clustersIdentified: z.number(),
   rejectedCount: z.number(),
+  freshnessState: z.string().default('LIVE'),
 });
 
 export type TrendIntelligenceOutput = z.infer<typeof TrendIntelligenceOutputSchema>;
@@ -183,6 +184,7 @@ export class TrendIntelligenceAgent {
       signalsProcessed: signals.length,
       clustersIdentified: opportunities.length,
       rejectedCount,
+      freshnessState: opportunities.length > 0 ? 'LIVE' : 'UNAVAILABLE',
     };
 
     return {

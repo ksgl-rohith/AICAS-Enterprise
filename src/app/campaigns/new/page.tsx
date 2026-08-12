@@ -35,6 +35,13 @@ export default function NewCampaignWizardPage() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  const [suggestions, setSuggestions] = useState<{
+    offerings: string[];
+    targetAudiences: string[];
+    ctas: string[];
+    pillars: string[];
+  } | null>(null);
+
   useEffect(() => {
     fetch('/api/brands')
       .then((res) => res.json())
@@ -45,6 +52,30 @@ export default function NewCampaignWizardPage() {
         }
       });
   }, []);
+
+  useEffect(() => {
+    if (!formData.brandId) return;
+    fetch(`/api/brands/${formData.brandId}/suggestions`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setSuggestions({
+            offerings: data.offerings || [],
+            targetAudiences: data.targetAudiences || [],
+            ctas: data.ctas || [],
+            pillars: data.pillars || [],
+          });
+          setFormData((prev) => ({
+            ...prev,
+            productOrTopic: data.defaultOffer || prev.productOrTopic,
+            targetAudience: data.defaultAudience || prev.targetAudience,
+            offerCTA: data.defaultCTA || prev.offerCTA,
+            name: prev.name || `Q3 ${data.brandName} Campaign`,
+          }));
+        }
+      })
+      .catch((err) => console.warn('Could not fetch brand suggestions:', err));
+  }, [formData.brandId]);
 
   const handleChannelToggle = (channel: string) => {
     const current = formData.channels;
@@ -170,6 +201,25 @@ export default function NewCampaignWizardPage() {
               onChange={(e) => setFormData({ ...formData, productOrTopic: e.target.value })}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
             />
+            {suggestions?.offerings && suggestions.offerings.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Suggested from Brand DNA:</span>
+                {suggestions.offerings.map((offering) => (
+                  <button
+                    key={offering}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, productOrTopic: offering })}
+                    className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      formData.productOrTopic === offering
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-500'
+                    }`}
+                  >
+                    + {offering}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -180,6 +230,25 @@ export default function NewCampaignWizardPage() {
               onChange={(e) => setFormData({ ...formData, offerCTA: e.target.value })}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
             />
+            {suggestions?.ctas && suggestions.ctas.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Suggested CTAs:</span>
+                {suggestions.ctas.map((cta) => (
+                  <button
+                    key={cta}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, offerCTA: cta })}
+                    className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      formData.offerCTA === cta
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-500'
+                    }`}
+                  >
+                    + {cta}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-4">
@@ -214,6 +283,25 @@ export default function NewCampaignWizardPage() {
               onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white"
             />
+            {suggestions?.targetAudiences && suggestions.targetAudiences.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Suggested Audiences:</span>
+                {suggestions.targetAudiences.map((aud) => (
+                  <button
+                    key={aud}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, targetAudience: aud })}
+                    className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      formData.targetAudience === aud
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-500'
+                    }`}
+                  >
+                    + {aud.slice(0, 45)}...
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

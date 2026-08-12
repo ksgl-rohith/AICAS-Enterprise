@@ -3,6 +3,7 @@ import { modelGateway } from './model-gateway';
 import { z } from 'zod';
 import { createHash } from 'crypto';
 import { auditService } from '@/lib/services/audit-service';
+import { brandNameDiscovery } from '@/lib/brand/brand-name-discovery';
 
 export interface ExtractedFieldEvidence<T = any> {
   value: T;
@@ -194,20 +195,30 @@ export class WebsiteBrandIntelligenceAgent {
     }
 
     const targetUrl = ssrfCheck.url.toString();
-    const domain = ssrfCheck.url.hostname;
+    const domainInfo = brandNameDiscovery.normalizeDomain(targetUrl);
+    const domain = domainInfo.hostname;
 
     // Fetch real HTML content from target site
     const pageData = await this.fetchPageHtml(targetUrl);
 
     let fetchedText = pageData?.cleanText || '';
-    let pageTitle = pageData?.title || `${domain} Website`;
+    let pageTitle = pageData?.title || `${domainInfo.primaryLabel} Website`;
     let pageDescription = pageData?.metaDescription || '';
+
+    // Discover brand identity using priority evidence signals (never returns 'www'!)
+    const discoveredIdentity = brandNameDiscovery.discoverBrandIdentity(
+      targetUrl,
+      pageData?.html || '',
+      pageTitle,
+      pageDescription
+    );
+
+    const fallbackName = discoveredIdentity.brandName;
 
     // If domain name or page content suggests legal / law firm / specific domain
     const isLawFirmDomain = domain.includes('law') || domain.includes('legal') || domain.includes('advocate') || domain.includes('kandvate') || fetchedText.toLowerCase().includes('law firm') || fetchedText.toLowerCase().includes('advocates');
 
     // Default fallback schema customized based on actual fetched text or domain keywords
-    const fallbackName = domain.split('.')[0].toUpperCase();
     const fallbackIndustry = isLawFirmDomain
       ? 'Legal Services & Law Firm'
       : 'Corporate & Business Services';
@@ -216,7 +227,7 @@ export class WebsiteBrandIntelligenceAgent {
       : `${fallbackName} provides corporate services and specialized domain solutions for business growth.`);
     const fallbackProducts = isLawFirmDomain
       ? ['Corporate Advisory', 'Dispute Resolution & Litigation', 'Intellectual Property Law', 'Regulatory Compliance & Contracts']
-      : [`${domain} Enterprise Services`, `${domain} Solutions`];
+      : [`${fallbackName} Enterprise Services`, `${fallbackName} Solutions`];
     const fallbackAudience = isLawFirmDomain
       ? 'Corporations, Enterprise Executives, Business Founders, Commercial Clients'
       : 'Business Executives, Marketing Managers, Enterprise Decision Makers';

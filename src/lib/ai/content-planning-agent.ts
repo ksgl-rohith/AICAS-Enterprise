@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AgentResult, AgentTask } from './agent-contract';
 import { agentRegistry } from './agent-registry';
 import { TrendOpportunitySchema } from './trend-intelligence-agent';
+import { contentArchetypeSystem } from './content-archetype-system';
 
 export const ContentPlanItemSchema = z.object({
   id: z.string(),
@@ -19,6 +20,7 @@ export const ContentPlanItemSchema = z.object({
   approvalRequired: z.boolean().default(true),
   assetRequirements: z.array(z.string()).default([]),
   category: z.enum(['evergreen', 'campaign', 'educational', 'conversion', 'reactive']),
+  archetype: z.string().default('educational_explainer'),
 });
 
 export type ContentPlanItem = z.infer<typeof ContentPlanItemSchema>;
@@ -93,6 +95,9 @@ export class ContentPlanningAgent {
       const stage = audienceStages[i % audienceStages.length];
       const cType = contentTypes[i % contentTypes.length];
 
+      // Select dynamic content archetype based on stage, category, and format
+      const archetypeDef = contentArchetypeSystem.selectArchetype(stage, category, cType, i);
+
       // Distribute dates evenly across duration
       const dayOffset = Math.floor((i * durationDays) / Math.max(1, targetCount));
       const postDate = new Date(startTs + dayOffset * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -101,14 +106,14 @@ export class ContentPlanningAgent {
       const relevantTrend = trendsList[i % Math.max(1, trendsList.length)];
       const title = relevantTrend && category === 'reactive'
         ? `Reactive Insight: ${relevantTrend.title}`
-        : `${campaignName}: ${pillar} Focus (${category})`;
+        : `${campaignName}: ${pillar} (${archetypeDef.name})`;
 
       const riskCategory: 'LOW' | 'MEDIUM' | 'HIGH' = category === 'reactive' ? 'MEDIUM' : 'LOW';
 
       items.push({
         id: `plan_item_${i + 1}`,
         title,
-        objective: `${objective} via ${stage} stage content`,
+        objective: `${objective} via ${stage} stage (${archetypeDef.name})`,
         contentPillar: pillar,
         audienceStage: stage,
         channel,
@@ -121,6 +126,7 @@ export class ContentPlanningAgent {
         approvalRequired: riskCategory !== 'LOW',
         assetRequirements: cType === 'carousel' ? ['5-slide infographic deck'] : ['Header Graphic'],
         category,
+        archetype: archetypeDef.id,
       });
     }
 

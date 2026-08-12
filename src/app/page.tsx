@@ -7,6 +7,7 @@ import { AppWalkthroughSection } from '@/components/showcase/app-walkthrough';
 import { FeatureShowcaseSection } from '@/components/showcase/feature-showcase';
 import { ContentGallerySection } from '@/components/showcase/content-gallery';
 import { AgentShowcaseSection } from '@/components/showcase/agent-showcase';
+import { ExpandedIntelligenceSection } from '@/components/showcase/expanded-intelligence-section';
 import { EnterpriseWorkflowSection } from '@/components/showcase/enterprise-workflow';
 import { AnalyticsShowcaseSection } from '@/components/showcase/analytics-showcase';
 import { PublishingShowcaseSection } from '@/components/showcase/publishing-showcase';
@@ -45,6 +46,9 @@ export default function ShowcasePage() {
 
         {/* Section 6: AI Agent Showcase */}
         <AgentShowcaseSection />
+
+        {/* What's New in AICAS Intelligence */}
+        <ExpandedIntelligenceSection />
 
         {/* Section 7: Enterprise Workflow */}
         <EnterpriseWorkflowSection />

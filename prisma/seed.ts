@@ -19,11 +19,11 @@ async function main() {
 
   console.log('Created user:', user.email);
 
-  // 2. Create Brand
+  // 2. Create Two Explicitly Labeled Demo Brands
   const brand = await prisma.brand.create({
     data: {
       userId: user.id,
-      name: 'ApexAI Solutions',
+      name: '[DEMO] ApexAI Enterprise Solutions',
       industry: 'Enterprise Software & AI',
       description: 'ApexAI provides enterprise-grade autonomous AI workflows, multi-agent orchestration, and governance for Fortune 500 organizations.',
       products: 'Apex Workflow Engine, Apex Brand DNA Guardian, Apex Multi-Agent Studio',
@@ -41,7 +41,28 @@ async function main() {
     },
   });
 
-  console.log('Created brand:', brand.name);
+  const demoBrand2 = await prisma.brand.create({
+    data: {
+      userId: user.id,
+      name: '[DEMO] Kandvate Legal Advisory',
+      industry: 'Legal Services & Law Firm',
+      description: 'Premier corporate legal advisory firm specializing in commercial dispute resolution, corporate governance, litigation, and regulatory compliance.',
+      products: 'Corporate Advisory, Dispute Resolution & Litigation, Intellectual Property Law, Regulatory Compliance & Contracts',
+      targetAudience: 'Corporation Founders, General Counsel, Enterprise Executives, Managing Directors',
+      personality: 'Authoritative, Diligent, Trusted, Strategic, High-Fidelity',
+      tone: 'Professional, rigorous, trustworthy, precise',
+      preferredVocabulary: 'Legal Counsel, Corporate Advisory, Due Diligence, Regulatory Compliance, Commercial Law',
+      prohibitedPhrases: 'Guaranteed court victory, Cheap legal hacks, 100% winning rate promise',
+      requiredDisclaimers: 'Legal Disclaimer: The information provided does not constitute formal attorney-client legal advice. Consultation required.',
+      defaultCTA: 'Schedule a Legal Consultation',
+      region: 'North America & India',
+      language: 'en-US',
+      brandColors: '#1e3a8a,#0284c7',
+      competitors: 'Skadden, Kirkland & Ellis, Latham & Watkins',
+    },
+  });
+
+  console.log('Created demo brands:', brand.name, 'and', demoBrand2.name);
 
   // 3. Create Brand Knowledge Documents & Chunks
   const doc1 = await prisma.brandKnowledgeDocument.create({

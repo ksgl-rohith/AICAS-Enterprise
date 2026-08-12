@@ -37,6 +37,8 @@ export const CopywritingOutputSchema = z.object({
 export type CopywritingOutput = z.infer<typeof CopywritingOutputSchema>;
 export type PlatformVariant = z.infer<typeof PlatformVariantSchema>;
 
+import { CONTENT_ARCHETYPES, ContentArchetypeId } from './content-archetype-system';
+
 export interface CopywritingInput {
   brandId: string;
   campaignId: string;
@@ -46,6 +48,7 @@ export interface CopywritingInput {
   format: 'text_post' | 'image_post' | 'carousel' | 'video_script';
   defaultCTA: string;
   channels: ('linkedin' | 'facebook' | 'instagram' | 'telegram')[];
+  archetype?: ContentArchetypeId;
 }
 
 export class CopywritingAgent {
@@ -88,6 +91,8 @@ export class CopywritingAgent {
     const cta = task.input.defaultCTA || pkg.defaultCTA || 'Learn More';
     const groundedFacts = pkg.groundedChunks.map((c) => `[${c.filename}]: ${c.content}`).join('\n') || '';
 
+    const chosenArchetype = task.input.archetype ? CONTENT_ARCHETYPES[task.input.archetype] : CONTENT_ARCHETYPES.educational_explainer;
+
     const systemPrompt = `You are an expert Social Media Copywriter for "${brandName}" (${industry}).
 Industry: ${industry}
 Company Overview: ${description}
@@ -97,14 +102,19 @@ Preferred Vocabulary: ${preferredVocab}
 Prohibited Phrases: ${prohibitedPhrases.join(', ') || 'None'}
 Required Disclaimers: ${requiredDisclaimers.join('\n') || 'None'}
 
+Target Content Archetype: ${chosenArchetype.name} (${chosenArchetype.id})
+Structural Rules: ${chosenArchetype.structuralRules}
+Opening Style: ${chosenArchetype.openingStyle}
+
 Grounded Knowledge Base & Evidence:
 ${groundedFacts || 'Verified brand knowledge documents.'}
 
 YOUR TASK:
-Craft tailored copy for each requested channel for "${brandName}" in the ${industry} domain. Strictly respect brand tone, use preferred vocabulary where natural, never use prohibited phrases, and append required disclaimers. Do NOT mention unrelated AI software concepts unless ${brandName} is an AI software company.`;
+Craft tailored copy for each requested channel for "${brandName}" in the ${industry} domain following the structural rules of the "${chosenArchetype.name}" archetype. Strictly respect brand tone, use preferred vocabulary where natural, never use prohibited phrases, and append required disclaimers. Do NOT mention unrelated AI software concepts unless ${brandName} is an AI software company.`;
 
     const userPrompt = `Topic Title: ${task.input.topicTitle}
 Pillar: ${task.input.contentPillar}
+Archetype: ${chosenArchetype.name} (${chosenArchetype.id})
 Format: ${task.input.format}
 Audience: ${task.input.targetAudience}
 CTA: ${cta}

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Radio, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Lock, Mail, Key, ShieldCheck, Plus, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
+import { connectorCapabilityRegistry } from '@/lib/connectors/connector-capability-registry';
 
 function IntegrationsSettingsContent() {
   const searchParams = useSearchParams();
