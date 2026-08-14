@@ -6,25 +6,42 @@ import { Building2, Plus, FileText, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function BrandsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch('/api/brands')
+  const fetchBrands = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/brands?workspaceId=${targetWs}`)
       .then((res) => res.json())
       .then((data) => {
         setBrands(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchBrands(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchBrands(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Brand Operations"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Brand Intelligence & Guidelines"
         description="Corporate brand DNA profiles, tone rules, prohibited terms, and ingested vector whitepapers."
         breadcrumbs={[
@@ -48,8 +65,8 @@ export default function BrandsPage() {
       ) : brands.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title="No Brand Profiles Found"
-          description="Extract your company website URL or upload whitepaper documents to create a brand DNA profile."
+          title={`No Brand Profiles in ${activeWorkspace?.name || 'Workspace'}`}
+          description="Extract your company website URL or upload whitepaper documents to create a brand DNA profile for this workspace."
           action={
             <Link
               href="/brands/new"

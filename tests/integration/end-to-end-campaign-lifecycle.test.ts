@@ -9,6 +9,7 @@ describe('End-to-End Campaign Lifecycle Acceptance Test', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
+    process.env.ENABLE_AUTONOMOUS_PUBLISHING = 'true';
 
     const user = await db.user.findFirst();
     const brand = await db.brand.create({
@@ -43,6 +44,7 @@ describe('End-to-End Campaign Lifecycle Acceptance Test', () => {
         endDate: new Date(Date.now() + 30 * 86400 * 1000),
         channels: 'linkedin,facebook',
         status: 'PLANNING',
+        oversightMode: 'AUTONOMOUS',
       },
     });
 

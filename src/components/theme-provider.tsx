@@ -23,7 +23,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setThemeState(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to dark
+      // Default to dark as requested for AICAS enterprise
+      setThemeState('dark');
       applyTheme('dark');
     }
   }, []);

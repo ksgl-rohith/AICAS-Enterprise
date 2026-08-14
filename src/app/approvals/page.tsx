@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, AlertTriangle, ThumbsUp, RotateCcw, Ban, ShieldCheck, Filter } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ThumbsUp, RotateCcw, Ban } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function ApprovalsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [items, setItems] = useState<any[]>([]);
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0, revisionRequested: 0, all: 0 });
   const [loading, setLoading] = useState(true);
@@ -14,8 +16,10 @@ export default function ApprovalsPage() {
   const [reviewerComment, setReviewerComment] = useState<{ [id: string]: string }>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const fetchItems = () => {
-    fetch(`/api/approvals?status=${filter.toUpperCase()}`)
+  const fetchItems = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/approvals?workspaceId=${targetWs}&status=${filter.toUpperCase()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.queue) {
@@ -30,8 +34,17 @@ export default function ApprovalsPage() {
   };
 
   useEffect(() => {
-    fetchItems();
-  }, [filter]);
+    fetchItems(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchItems(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [filter, activeWorkspace?.id]);
 
   const handleDecision = async (contentItemId: string, decision: 'APPROVED' | 'REVISION_REQUESTED' | 'REJECTED') => {
     setProcessingId(contentItemId);
@@ -52,8 +65,7 @@ export default function ApprovalsPage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        // Refetch and update state immediately
-        fetchItems();
+        fetchItems(activeWorkspace?.id);
       } else {
         alert(data.error || 'Failed to record approval decision.');
       }
@@ -67,7 +79,7 @@ export default function ApprovalsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Campaign Governance"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Human Oversight & Approval Queue"
         description="Review AI-generated post drafts against brand voice scores, factual grounding evidence, and compliance guardrails."
         breadcrumbs={[
@@ -116,8 +128,8 @@ export default function ApprovalsPage() {
       ) : items.length === 0 ? (
         <EmptyState
           icon={CheckCircle2}
-          title="Approval Queue is Clear"
-          description={`There are currently no items matching the '${filter}' status filter.`}
+          title={`Approval Queue is Clear for ${activeWorkspace?.name || 'Workspace'}`}
+          description={`There are currently no items matching the '${filter}' status filter in this workspace.`}
           action={
             filter !== 'all' ? (
               <button

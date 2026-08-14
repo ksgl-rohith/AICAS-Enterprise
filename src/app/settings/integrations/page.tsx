@@ -2,15 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Radio, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Lock, Key, Send, Download, GitMerge, X } from 'lucide-react';
+import { Radio, CheckCircle2, AlertCircle, Key, Send, Download, GitMerge, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { connectorCapabilityRegistry, IntegrationGroup, ConnectorCapability } from '@/lib/connectors/connector-capability-registry';
 import { PublishDrawer } from '@/components/integrations/publish-drawer';
 import { ExportPackageDrawer } from '@/components/integrations/export-package-drawer';
 import { PotentialDuplicatesModal } from '@/components/brands/potential-duplicates-modal';
+import { useWorkspace } from '@/components/workspace-context';
 
 function IntegrationsSettingsContent() {
+  const { activeWorkspace } = useWorkspace();
   const searchParams = useSearchParams();
   const successParam = searchParams.get('success');
   const errorParam = searchParams.get('error');
@@ -30,8 +32,10 @@ function IntegrationsSettingsContent() {
   const [credValues, setCredValues] = useState<{ [key: string]: string }>({});
   const [savingCred, setSavingCred] = useState(false);
 
-  const fetchIntegrations = () => {
-    fetch('/api/integrations')
+  const fetchIntegrations = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/integrations?workspaceId=${targetWs}`)
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
@@ -41,8 +45,17 @@ function IntegrationsSettingsContent() {
   };
 
   useEffect(() => {
-    fetchIntegrations();
-  }, []);
+    fetchIntegrations(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchIntegrations(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
 
   const handleLinkedInConnect = async () => {
     try {
@@ -72,50 +85,6 @@ function IntegrationsSettingsContent() {
     }
   };
 
-  const handleTestConnection = async (platform: string) => {
-    setTesting({ ...testing, [platform]: true });
-    try {
-      const endpoint =
-        platform === 'linkedin'
-          ? '/api/integrations/linkedin/test'
-          : '/api/integrations/facebook/test';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId: data?.brandId }),
-      });
-      const resData = await res.json();
-      if (res.ok && resData.success) {
-        alert(`Success! Connected to account: ${resData.accountName}`);
-      } else {
-        alert(`Test Connection Result: ${resData.error || 'Connected and validated'}`);
-      }
-    } catch (err: any) {
-      alert(`Connection error: ${err.message}`);
-    } finally {
-      setTesting({ ...testing, [platform]: false });
-    }
-  };
-
-  const handleSyncSocialData = async (platform: string) => {
-    try {
-      const res = await fetch('/api/integrations/sync-social-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, brandId: data?.brandId }),
-      });
-      const resData = await res.json();
-      if (res.ok) {
-        alert(resData.message);
-        fetchIntegrations();
-      } else {
-        alert(resData.error || 'Failed to sync social data.');
-      }
-    } catch {
-      alert('Error initiating social data sync.');
-    }
-  };
-
   const handleSaveCredentialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeModalProvider) return;
@@ -139,6 +108,7 @@ function IntegrationsSettingsContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          tenantId: activeWorkspace?.id || 'tenant-default',
           category: categoryMap[activeModalProvider] || 'social',
           provider: activeModalProvider,
           name: `${activeModalProvider.toUpperCase()} UI Credential`,
@@ -151,7 +121,7 @@ function IntegrationsSettingsContent() {
         alert(`Successfully saved and encrypted ${activeModalProvider} credentials!`);
         setActiveModalProvider(null);
         setCredValues({});
-        fetchIntegrations();
+        fetchIntegrations(activeWorkspace?.id);
       } else {
         alert(resData.error || 'Failed to save credential.');
       }
@@ -181,7 +151,7 @@ function IntegrationsSettingsContent() {
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <PageHeader
-          eyebrow="Administration & Connectors"
+          eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
           title="Platform Integration Center & Governed Live Publishing"
           description="Manage OAuth connections, API credentials, duplicate Brand Profiles, and trigger governed live publishing directly from the integration center."
           breadcrumbs={[
@@ -222,7 +192,7 @@ function IntegrationsSettingsContent() {
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Radio className="w-4 h-4 text-emerald-500" /> Publishing System Execution Mode
+            <Radio className="w-4 h-4 text-emerald-500" /> Publishing System Execution Mode ({activeWorkspace?.code})
           </h2>
           <Badge variant="emerald">
             {systemConfig.publishingMode?.toUpperCase() || 'SIMULATED'}
@@ -297,7 +267,6 @@ function IntegrationsSettingsContent() {
 
                         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{cap.description}</p>
 
-                        {/* Capabilities Tags */}
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {cap.publishing && <Badge variant="slate">Publishing</Badge>}
                           {cap.analytics && <Badge variant="slate">Analytics</Badge>}
@@ -308,7 +277,6 @@ function IntegrationsSettingsContent() {
                         </div>
                       </div>
 
-                      {/* Dynamic Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-1.5">
                           <button
@@ -366,48 +334,133 @@ function IntegrationsSettingsContent() {
         })}
       </div>
 
-      {/* Credential Modal */}
+      {/* Dynamic Credential Schema Modal */}
       {activeModalProvider && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Key className="w-4 h-4 text-indigo-500" />
-                <span>Configure {activeModalProvider.toUpperCase()} Credentials</span>
+                <span>Configure {activeModalProvider.toUpperCase()} Integration</span>
               </h3>
-              <button onClick={() => setActiveModalProvider(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+              <button onClick={() => { setActiveModalProvider(null); setCredValues({}); }} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCredentialSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 dark:text-slate-300">API Key / Token / Secret</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter token or credential key..."
-                  value={credValues.api_key || credValues.token || ''}
-                  onChange={(e) => setCredValues({ api_key: e.target.value, token: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono"
-                />
-              </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Provide mandatory API credentials required by the {activeModalProvider.toUpperCase()} connector schema for workspace {activeWorkspace?.name}. Secrets will be encrypted before storage.
+            </p>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+            <form onSubmit={handleSaveCredentialSubmit} className="space-y-4 text-xs">
+              {(() => {
+                const schemaMap: Record<string, { key: string; label: string; type: string; required: boolean; secret: boolean; helpText: string }[]> = {
+                  linkedin: [
+                    { key: 'client_id', label: 'Client / App ID', type: 'text', required: true, secret: false, helpText: 'Client ID from LinkedIn Developer Portal' },
+                    { key: 'client_secret', label: 'Client Secret', type: 'password', required: true, secret: true, helpText: 'OAuth 2.0 Client Secret' },
+                    { key: 'redirect_uri', label: 'Redirect URI', type: 'url', required: true, secret: false, helpText: 'Authorized redirect URL' },
+                    { key: 'organization_id', label: 'Organization URN (Optional)', type: 'text', required: false, secret: false, helpText: 'urn:li:organization:12345' },
+                  ],
+                  facebook: [
+                    { key: 'app_id', label: 'Meta App ID', type: 'text', required: true, secret: false, helpText: 'Meta Developer App ID' },
+                    { key: 'app_secret', label: 'Meta App Secret', type: 'password', required: true, secret: true, helpText: 'Meta App Secret' },
+                    { key: 'page_id', label: 'Facebook Page ID', type: 'text', required: true, secret: false, helpText: 'Facebook Page Numeric ID' },
+                    { key: 'access_token', label: 'Page Access Token', type: 'password', required: true, secret: true, helpText: 'Long-lived Page Access Token' },
+                  ],
+                  instagram: [
+                    { key: 'app_id', label: 'Meta App ID', type: 'text', required: true, secret: false, helpText: 'Meta App ID' },
+                    { key: 'app_secret', label: 'Meta App Secret', type: 'password', required: true, secret: true, helpText: 'Meta App Secret' },
+                    { key: 'instagram_account_id', label: 'Instagram Professional Account ID', type: 'text', required: true, secret: false, helpText: 'Connected Instagram Account ID' },
+                    { key: 'access_token', label: 'Page / User Access Token', type: 'password', required: true, secret: true, helpText: 'Long-lived Access Token' },
+                  ],
+                  telegram: [
+                    { key: 'bot_token', label: 'Telegram Bot Token', type: 'password', required: true, secret: true, helpText: 'Bot API Token from @BotFather' },
+                    { key: 'chat_id', label: 'Chat / Channel ID', type: 'text', required: true, secret: false, helpText: 'Telegram Channel or Group ID' },
+                  ],
+                  youtube: [
+                    { key: 'client_id', label: 'Google OAuth Client ID', type: 'text', required: true, secret: false, helpText: 'Google Cloud Console OAuth Client ID' },
+                    { key: 'client_secret', label: 'Google OAuth Client Secret', type: 'password', required: true, secret: true, helpText: 'Google Cloud OAuth Secret' },
+                    { key: 'channel_id', label: 'YouTube Channel ID', type: 'text', required: true, secret: false, helpText: 'YouTube Channel ID (e.g. UC...)' },
+                  ],
+                  x: [
+                    { key: 'api_key', label: 'API Key (Consumer Key)', type: 'text', required: true, secret: false, helpText: 'X Developer Portal API Key' },
+                    { key: 'api_secret', label: 'API Key Secret', type: 'password', required: true, secret: true, helpText: 'X Developer Portal API Secret' },
+                    { key: 'bearer_token', label: 'Bearer Token', type: 'password', required: true, secret: true, helpText: 'v2 API Bearer Token' },
+                  ],
+                  wordpress: [
+                    { key: 'site_url', label: 'WordPress Site URL', type: 'url', required: true, secret: false, helpText: 'e.g. https://blog.company.com' },
+                    { key: 'username', label: 'WordPress Username / Email', type: 'text', required: true, secret: false, helpText: 'Authorized WordPress user login' },
+                    { key: 'application_password', label: 'Application Password', type: 'password', required: true, secret: true, helpText: 'Generated Application Password' },
+                  ],
+                };
+
+                const fields = schemaMap[activeModalProvider] || [
+                  { key: 'api_key', label: 'API Key / Secret Token', type: 'password', required: true, secret: true, helpText: 'Authentication API key or secret token' },
+                ];
+
+                return fields.map((field) => (
+                  <div key={field.key} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-700 dark:text-slate-300">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
+                      </label>
+                      {field.secret && (
+                        <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded">
+                          ENCRYPTED SECRET
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type={field.secret ? 'password' : field.type === 'url' ? 'url' : 'text'}
+                      required={field.required}
+                      placeholder={field.helpText}
+                      value={credValues[field.key] || ''}
+                      onChange={(e) => setCredValues({ ...credValues, [field.key]: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                    />
+                    <p className="text-[10px] text-slate-400">{field.helpText}</p>
+                  </div>
+                ));
+              })()}
+
+              <div className="pt-2 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setActiveModalProvider(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold"
+                  onClick={async () => {
+                    alert(`Testing connection to ${activeModalProvider.toUpperCase()} via health check...`);
+                    try {
+                      const res = await fetch('/api/credentials', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'test', category: 'social', provider: activeModalProvider, tenantId: activeWorkspace?.id }),
+                      });
+                      const data = await res.json();
+                      alert(data.success ? `✓ Test Connection Successful! Account verified.` : `Connection Test Warning: ${data.message || data.error || 'Check credentials.'}`);
+                    } catch {
+                      alert('Connection test failed.');
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
                 >
-                  Cancel
+                  Test Connection
                 </button>
-                <button
-                  type="submit"
-                  disabled={savingCred}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-xs"
-                >
-                  {savingCred ? 'Encrypting...' : 'Save Credential'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setActiveModalProvider(null); setCredValues({}); }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingCred}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-sm"
+                  >
+                    {savingCred ? 'Encrypting...' : 'Save Credential'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -420,7 +473,7 @@ function IntegrationsSettingsContent() {
           platform={publishPlatform}
           brandId={data?.brandId || 'brand_default'}
           onClose={() => setPublishPlatform(null)}
-          onSuccess={fetchIntegrations}
+          onSuccess={() => fetchIntegrations(activeWorkspace?.id)}
         />
       )}
 
@@ -437,7 +490,7 @@ function IntegrationsSettingsContent() {
       {showDuplicatesModal && (
         <PotentialDuplicatesModal
           onClose={() => setShowDuplicatesModal(false)}
-          onMerged={fetchIntegrations}
+          onMerged={() => fetchIntegrations(activeWorkspace?.id)}
         />
       )}
     </div>

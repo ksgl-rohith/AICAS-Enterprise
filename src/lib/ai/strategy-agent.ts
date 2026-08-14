@@ -33,6 +33,13 @@ export const SourceFreshnessSchema = z.object({
   status: z.string(),
 });
 
+export const RevisionSummarySchema = z.object({
+  appliedFeedback: z.string(),
+  feedbackCategories: z.array(z.string()),
+  keyChanges: z.array(z.string()),
+  refreshedAt: z.string(),
+});
+
 export const StrategyOutputSchema = z.object({
   objectiveInterpretation: z.string(),
   audienceSummary: z.string(),
@@ -46,6 +53,7 @@ export const StrategyOutputSchema = z.object({
   sourceFreshness: z.array(SourceFreshnessSchema).optional(),
   confidence: z.number().optional(),
   limitations: z.array(z.string()).optional(),
+  revisionSummary: RevisionSummarySchema.optional(),
 });
 
 export type StrategyOutput = z.infer<typeof StrategyOutputSchema>;
@@ -61,6 +69,14 @@ export interface StrategyInput {
   channels: string[];
   requiredMessages?: string;
   prohibitedThemes?: string;
+  // Feedback-driven intelligence refresh parameters
+  userFeedback?: string;
+  feedbackCategories?: string[];
+  previousStrategy?: Partial<StrategyOutput>;
+  rerunMarketResearch?: boolean;
+  rerunTrendIntelligence?: boolean;
+  rerunForecasting?: boolean;
+  rerunBrandContext?: boolean;
 }
 
 export class StrategyAgent {
@@ -196,6 +212,16 @@ export class StrategyAgent {
     const trends = mrRes.output?.industryTrends.join('; ') || `High demand for trusted ${task.input.productOrTopic} in ${industry}.`;
     const formats = mrRes.output?.highPerformingContentFormats.join('; ') || 'Visual carousels & informative guide posts.';
 
+    const hasFeedback = Boolean(task.input.userFeedback && task.input.userFeedback.trim().length > 0);
+    const feedbackCategories = task.input.feedbackCategories || [];
+
+    const feedbackSection = hasFeedback
+      ? `\nREVISION FEEDBACK & ITERATION DIRECTIVES:
+Target Categories: ${feedbackCategories.length > 0 ? feedbackCategories.join(', ') : 'General Strategy Alignment'}
+User Feedback: "${task.input.userFeedback}"
+Instructions: Adjust the strategy narrative, pillars, and channel angles specifically to incorporate this feedback while strictly preserving immutable Brand DNA (${brandName}, ${industry}, tone: ${brandTone}).`
+      : '';
+
     const systemPrompt = `You are an elite Enterprise AI Campaign Strategist for "${brandName}".
 Industry: ${industry}
 Company Overview: ${description || 'Not specified'}
@@ -211,9 +237,10 @@ Market Intelligence Signals:
 
 Grounding Evidence:
 ${groundedFacts || 'Verified brand knowledge documents.'}
+${feedbackSection}
 
 TASK:
-Generate a tailored, high-impact multi-channel content strategy specifically designed for ${brandName} (${industry}). Ensure the pillars, angles, and content ideas reflect this company's actual business model, market intelligence, and unique brand identity.`;
+Generate a tailored, high-impact multi-channel content strategy specifically designed for ${brandName} (${industry}). Ensure the pillars, angles, and content ideas reflect this company's actual business model, market intelligence, unique brand identity, and any requested revision feedback.`;
 
     const userPrompt = `Campaign Name: ${task.input.name}
 Objective: ${task.input.objective}
@@ -222,16 +249,39 @@ Target Audience: ${task.input.targetAudience}
 CTA: ${task.input.offerCTA || defaultCTA}
 Target Channels: ${task.input.channels.join(', ')}
 Required Messages: ${task.input.requiredMessages || 'None'}
-Prohibited Themes: ${task.input.prohibitedThemes || 'None'}`;
+Prohibited Themes: ${task.input.prohibitedThemes || 'None'}${hasFeedback ? `\nRevision Feedback: ${task.input.userFeedback}` : ''}`;
+
+    const keyChangesList: string[] = [];
+    if (hasFeedback) {
+      if (feedbackCategories.includes('Audience') || feedbackCategories.includes('Audience Focus')) {
+        keyChangesList.push(`Refined target audience persona segmentation to align with: "${task.input.userFeedback?.slice(0, 60)}..."`);
+      }
+      if (feedbackCategories.includes('Messaging') || feedbackCategories.includes('Tone')) {
+        keyChangesList.push(`Updated narrative and tone inflection based on user guidance.`);
+      }
+      if (feedbackCategories.includes('Content Pillars')) {
+        keyChangesList.push(`Rebalanced core thematic pillars and proof-point angles.`);
+      }
+      if (feedbackCategories.includes('Channels')) {
+        keyChangesList.push(`Recalibrated channel roles for enhanced multi-platform synergy.`);
+      }
+      if (keyChangesList.length === 0) {
+        keyChangesList.push(`Incorporated feedback into campaign narrative, pillar angles, and content topics: "${task.input.userFeedback?.slice(0, 80)}"`);
+      }
+    }
+
+    const narrative = hasFeedback
+      ? `Elevating ${brandName}'s leadership in ${industry} with focused emphasis on ${task.input.userFeedback?.slice(0, 100)}, spotlighting ${task.input.productOrTopic} through authentic ${brandTone.toLowerCase()} messaging.`
+      : `Elevating ${brandName}'s leadership in ${industry} by spotlighting ${task.input.productOrTopic} through authentic, ${brandTone.toLowerCase()} messaging backed by verifiable brand facts.`;
 
     const mockFallback: StrategyOutput = {
       objectiveInterpretation: `Drive targeted ${task.input.objective.replace(/_/g, ' ')} for ${task.input.productOrTopic} among ${task.input.targetAudience} in the ${industry} domain.`,
       audienceSummary: `${task.input.targetAudience} seeking reliable, high-quality ${task.input.productOrTopic} in ${industry}, aligned with ${brandName}'s value proposition (${personality || brandTone}).`,
-      campaignNarrative: `Elevating ${brandName}'s leadership in ${industry} by spotlighting ${task.input.productOrTopic} through authentic, ${brandTone.toLowerCase()} messaging backed by verifiable brand facts.`,
+      campaignNarrative: narrative,
       contentPillars: [
         {
-          name: `${task.input.productOrTopic} Excellence & Leadership`,
-          angle: `How ${brandName} delivers superior ${task.input.productOrTopic} for ${task.input.targetAudience}`,
+          name: hasFeedback ? `${task.input.productOrTopic} Leadership & Focus` : `${task.input.productOrTopic} Excellence & Leadership`,
+          angle: hasFeedback ? `Addressing core market priorities with emphasis on ${task.input.userFeedback?.slice(0, 50)}` : `How ${brandName} delivers superior ${task.input.productOrTopic} for ${task.input.targetAudience}`,
           rationale: `Positions ${brandName} as a premier, trusted provider in ${industry}.`,
           relevanceExplanation: `Grounds campaign directly in ${brandName}'s core ${industry} offerings.`,
           evidenceIds: ['doc_brand_dna_01'],
@@ -273,6 +323,12 @@ Prohibited Themes: ${task.input.prohibitedThemes || 'None'}`;
       sourceFreshness,
       confidence: latestMetric ? 0.95 : 0.88,
       limitations: latestMetric ? [] : ['Social API analytics not connected; confidence interval widened for cold-start baseline.'],
+      revisionSummary: hasFeedback ? {
+        appliedFeedback: task.input.userFeedback || '',
+        feedbackCategories,
+        keyChanges: keyChangesList,
+        refreshedAt: new Date().toISOString(),
+      } : undefined,
     };
 
     const res = await modelGateway.generateStructured({
@@ -288,6 +344,14 @@ Prohibited Themes: ${task.input.prohibitedThemes || 'None'}`;
     output.sourceFreshness = sourceFreshness;
     output.confidence = latestMetric ? 0.95 : 0.88;
     output.limitations = latestMetric ? [] : ['Social API analytics not connected; confidence interval widened for cold-start baseline.'];
+    if (hasFeedback && !output.revisionSummary) {
+      output.revisionSummary = {
+        appliedFeedback: task.input.userFeedback || '',
+        feedbackCategories,
+        keyChanges: keyChangesList.length > 0 ? keyChangesList : ['Strategy revised according to user feedback guidance.'],
+        refreshedAt: new Date().toISOString(),
+      };
+    }
 
     // Evaluate Brand Relevance Gate & Industry Drift Detector
     const relevance = brandRelevanceGate.evaluateRelevance(output.campaignNarrative + ' ' + output.contentPillars.map((p) => p.name).join(' '), pkg, task.input.objective);

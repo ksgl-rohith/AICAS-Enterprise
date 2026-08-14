@@ -1,76 +1,56 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Sparkles,
   Sun,
   Moon,
   LogOut,
   ShieldCheck,
   ChevronDown,
   Bot,
-  User,
   SlidersHorizontal,
   Settings,
 } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
 import { useAuth } from '@/components/auth-context';
-import { AdminPreferencesModal } from '@/components/ui/admin-preferences-modal';
+import { WorkspaceSwitcher } from '@/components/layout/workspace-switcher';
+import { AiEnginePopover } from '@/components/layout/ai-engine-popover';
+import { PublishingControlPopover } from '@/components/layout/publishing-control-popover';
 
 export function Header() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { user, isAdmin, logout } = useAuth();
-  const [showAdminModal, setShowAdminModal] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [config, setConfig] = useState<{
-    publishingMode: string;
-    allowLivePublishing: boolean;
-    aiMode: string;
-    hasGeminiKey: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    fetch('/api/integrations')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.systemConfig) {
-          setConfig(data.systemConfig);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 transition-colors duration-200">
-      {/* Title & Context */}
+      {/* Active Workspace Switcher & Title */}
       <div className="flex items-center gap-3 pl-12 lg:pl-0">
-        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-          <Bot className="w-4.5 h-4.5" />
-        </div>
-        <div>
-          <h1 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+        <WorkspaceSwitcher />
+
+        <div className="hidden lg:block border-l border-slate-200 dark:border-slate-800 pl-3">
+          <h1 className="text-xs font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <span>Enterprise Content Studio</span>
           </h1>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
             Multi-Agent Campaign Orchestration & Governance
           </p>
         </div>
       </div>
 
-      {/* Right controls: AI Engine Mode, Theme Toggle, User/Admin Menu */}
+      {/* Right Navbar Controls Group */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* AI Engine Status Indicator */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-          <span className="text-slate-600 dark:text-slate-300 text-[11px]">
-            Engine:{' '}
-            <strong className="text-indigo-600 dark:text-indigo-400">
-              {config?.hasGeminiKey ? 'Gemini 2.5 Flash' : 'Mock Engine'}
-            </strong>
-          </span>
+        {/* Interactive AI Engine Mode Control */}
+        <div className="hidden sm:block">
+          <AiEnginePopover />
+        </div>
+
+        {/* Governed Publishing Mode Control */}
+        <div className="hidden md:block">
+          <PublishingControlPopover />
         </div>
 
         {/* Theme Toggle Button */}
@@ -93,13 +73,13 @@ export function Header() {
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
             aria-expanded={userDropdownOpen}
             aria-label="User Account Menu"
-            className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg py-1 px-1"
+            className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg py-1 px-1"
           >
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-sm uppercase shrink-0">
               {user?.name ? user.name.slice(0, 2) : 'AD'}
             </div>
             <div className="hidden sm:block text-left">
-              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block leading-tight truncate max-w-[120px]">
+              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block leading-tight truncate max-w-[110px]">
                 {user?.name || 'Administrator'}
               </span>
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block leading-none capitalize">
@@ -154,7 +134,7 @@ export function Header() {
                   className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 flex items-center justify-between font-medium transition-colors"
                 >
                   <span className="flex items-center gap-2.5">
-                    {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+                    {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
                     <span>Theme</span>
                   </span>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">{theme}</span>
@@ -177,9 +157,6 @@ export function Header() {
           )}
         </div>
       </div>
-
-      {/* Admin Preferences Quick Modal */}
-      <AdminPreferencesModal isOpen={showAdminModal} onClose={() => setShowAdminModal(false)} />
     </header>
   );
 }

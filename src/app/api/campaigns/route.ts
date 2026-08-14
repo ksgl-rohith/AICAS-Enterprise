@@ -1,13 +1,23 @@
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId');
+    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId');
+
+    let whereClause: any = {};
+    if (brandId) {
+      whereClause.brandId = brandId;
+    } else if (workspaceId) {
+      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
+      whereClause.brandId = { in: allowedBrandIds };
+    }
 
     const campaigns = await db.campaign.findMany({
-      where: brandId ? { brandId } : undefined,
+      where: whereClause,
       include: {
         brand: {
           select: { id: true, name: true },
@@ -34,7 +44,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 

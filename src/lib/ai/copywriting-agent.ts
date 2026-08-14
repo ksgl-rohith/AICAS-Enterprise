@@ -127,17 +127,16 @@ Channels requested: ${task.input.channels.join(', ')}`;
       if (channel === 'linkedin') {
         return {
           channel: 'linkedin',
-          headline: `${task.input.topicTitle}: Insights for ${industry}`,
-          hook: `Why ${task.input.targetAudience} trust ${brandName} for ${task.input.topicTitle}.`,
-          bodyText: `In today's evolving ${industry} landscape, decision makers require proven expertise and transparent standards.
+          headline: `${task.input.topicTitle}: Enterprise Insights for ${industry}`,
+          hook: `How ${brandName} achieves verifiable results for ${task.input.targetAudience}.`,
+          bodyText: `${brandName} delivers verifiable solutions for ${task.input.targetAudience} across ${industry}.
 
-Key insights for ${task.input.targetAudience}:
-1. Innovation backed by ${brandName}'s core values
-2. Streamlined operations built for quality and compliance
-3. Verifiable results aligned with ${brandTone.toLowerCase()} standards
+Key operational priorities:
+1. Practical innovation aligned with ${brandName}'s core capabilities
+2. Streamlined execution focused on quality and compliance
+3. Verifiable outcomes governed by ${brandTone.toLowerCase()} standards
 
-Discover how ${brandName} is delivering measurable value across ${industry}.
-
+Explore how ${brandName} achieves measurable results for ${task.input.topicTitle}.
 ${requiredDisclaimers.length > 0 ? `\nNote: ${requiredDisclaimers[0]}` : ''}`,
           ctaText: `${cta}`,
           hashtags: [`#${brandName.replace(/\s+/g, '')}`, `#${industry.replace(/[^a-zA-Z0-9]/g, '')}`, '#IndustryLeadership'],

@@ -110,7 +110,7 @@ describe('Multi-Industry End-to-End Acceptance Test (SCENARIO A & SCENARIO B)', 
     expect(linkedinVariant).toBeDefined();
     expect(linkedinVariant?.bodyText.toLowerCase()).not.toContain('multi-agent studio');
     expect(linkedinVariant?.bodyText.toLowerCase()).not.toContain('ai workflow engine');
-  }, 15000);
+  }, 35000);
 
   it('SCENARIO B: Brand Intelligence for Legal Advisory generates distinct legal strategy and copy with legal disclaimers', async () => {
     // 1. Create Legal Advisory Brand

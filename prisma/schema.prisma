@@ -45,6 +45,7 @@ model UserPreferences {
   allowedDefaultTextModel String   @default("gemini-2.5-flash")
   allowedImageModel       String   @default("imagen-3")
   executionMode           String   @default("mock")
+  publishingMode          String   @default("SIMULATED")
   fallbackBehavior        String   @default("mock_fallback")
   costWarningThresholdUsd Float    @default(250.0)
   notifyApprovals         Boolean  @default(true)

@@ -21,6 +21,8 @@ describe('Brand Identity Domain Normalization & Deduplication System', () => {
     if (!user) return;
 
     // Create primary brand
+    await db.brand.deleteMany({ where: { normalizedDomain: 'apexlegal.com' } });
+
     const primary = await db.brand.create({
       data: {
         userId: user.id,

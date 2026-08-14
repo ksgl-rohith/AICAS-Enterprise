@@ -165,6 +165,30 @@ export const APPROVED_CONNECTOR_SCHEMAS: Record<string, ConnectorSchema> = {
       { key: 'api_key', label: 'Stability API Key', type: 'password', required: true, secret: true, helpText: 'sk-...' },
     ],
   },
+
+  // Owned Media & Webhooks
+  wordpress: {
+    category: 'social',
+    provider: 'wordpress',
+    name: 'WordPress REST API Connector',
+    icon: 'globe',
+    fields: [
+      { key: 'site_url', label: 'WordPress Site URL', type: 'url', required: true, secret: false, helpText: 'e.g. https://blog.mycompany.com' },
+      { key: 'username', label: 'WordPress Username / Email', type: 'text', required: true, secret: false, helpText: 'Authorized WordPress user login' },
+      { key: 'application_password', label: 'Application Password', type: 'password', required: true, secret: true, helpText: 'Generated Application Password (xxxx xxxx xxxx xxxx)' },
+    ],
+  },
+  webhook: {
+    category: 'other',
+    provider: 'webhook',
+    name: 'Custom CMS Webhook Endpoint',
+    icon: 'webhook',
+    fields: [
+      { key: 'endpoint_url', label: 'Webhook Endpoint URL', type: 'url', required: true, secret: false, helpText: 'HTTPS endpoint to receive payload' },
+      { key: 'auth_type', label: 'Authentication Type', type: 'select', required: true, secret: false, helpText: 'Auth method', options: [{ label: 'Bearer Token', value: 'bearer' }, { label: 'Signing Secret', value: 'secret' }] },
+      { key: 'signing_secret', label: 'Secret Key / Token', type: 'password', required: true, secret: true, helpText: 'Signing secret or Bearer token' },
+    ],
+  },
 };
 
 export class ApiCredentialsService {

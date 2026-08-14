@@ -93,17 +93,17 @@ export function EnterpriseWorkflowSection() {
   const activeStage = workflowStages.find((s) => s.id === activeStageId) || workflowStages[0];
 
   return (
-    <section id="workflow" className="py-24 relative overflow-hidden px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-white">
+    <section id="workflow" className="py-24 relative overflow-hidden px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       {/* Section Header */}
       <div className="text-center max-w-3xl mx-auto mb-16">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold mb-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-semibold mb-4">
           <Brain className="w-3.5 h-3.5" />
           <span>Interactive Enterprise Lifecycle</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight mb-6">
+        <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6">
           10-Stage Autonomous Execution Workflow
         </h2>
-        <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
+        <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg leading-relaxed">
           From initial campaign wizard setup to causal learning, experience how every stage expands with purpose and concrete system outputs.
         </p>
       </div>
@@ -120,7 +120,7 @@ export function EnterpriseWorkflowSection() {
               className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between ${
                 isActive
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20 ring-1 ring-indigo-500'
-                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
               }`}
             >
               <div className="text-[10px] font-bold font-mono opacity-80 mb-1">0{stage.id}</div>
@@ -132,34 +132,34 @@ export function EnterpriseWorkflowSection() {
       </div>
 
       {/* Stage Detail Card */}
-      <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl">
-        <div className="flex items-center justify-between pb-6 border-b border-slate-200">
+      <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-indigo-950/20">
+        <div className="flex items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-md">
               0{activeStage.id}
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-slate-900">{activeStage.title}</h3>
-              <p className="text-xs text-indigo-600 font-mono font-semibold">Stage {activeStage.id} of 10</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{activeStage.title}</h3>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-mono font-semibold">Stage {activeStage.id} of 10</p>
             </div>
           </div>
-          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
             Active Workflow Stage
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 text-xs">
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Stage Purpose</span>
-            <p className="text-slate-800 text-sm leading-relaxed">{activeStage.purpose}</p>
+          <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Stage Purpose</span>
+            <p className="text-slate-800 dark:text-slate-200 text-sm leading-relaxed">{activeStage.purpose}</p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-200 space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="p-5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Example System Output
             </span>
-            <p className="text-slate-800 font-mono text-[11px] leading-relaxed p-3 rounded-xl bg-white border border-indigo-200 shadow-xs">
+            <p className="text-slate-800 dark:text-slate-200 font-mono text-[11px] leading-relaxed p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800/80 shadow-xs">
               {activeStage.exampleOutput}
             </p>
           </div>

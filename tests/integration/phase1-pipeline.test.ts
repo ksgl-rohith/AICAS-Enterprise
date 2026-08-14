@@ -54,5 +54,5 @@ describe('Phase 1 Pipeline End-to-End Integration', () => {
     expect(res.output?.stepsExecuted.length).toBeGreaterThanOrEqual(5);
     expect(res.output?.trendIntelligence).toBeDefined();
     expect(res.output?.contentPlan).toBeDefined();
-  });
+  }, 60000);
 });

@@ -4,7 +4,7 @@ import { approvalService } from '@/lib/approval/approval-service';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get('tenantId') || 'tenant-default';
+    const tenantId = searchParams.get('workspaceId') || searchParams.get('tenantId') || 'tenant-default';
     const status = searchParams.get('status') || 'PENDING';
 
     const result = await approvalService.getApprovalQueue(tenantId, status);

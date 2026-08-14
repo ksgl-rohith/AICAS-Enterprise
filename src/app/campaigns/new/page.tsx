@@ -70,7 +70,7 @@ export default function NewCampaignWizardPage() {
             productOrTopic: data.defaultOffer || prev.productOrTopic,
             targetAudience: data.defaultAudience || prev.targetAudience,
             offerCTA: data.defaultCTA || prev.offerCTA,
-            name: prev.name || `Q3 ${data.brandName} Campaign`,
+            name: prev.name || (data.suggestedCampaignNames ? data.suggestedCampaignNames[0] : `${data.brandName || 'Enterprise'} Campaign`),
           }));
         }
       })
@@ -168,7 +168,7 @@ export default function NewCampaignWizardPage() {
               <input
                 type="text"
                 required
-                placeholder="e.g. Q3 Multi-Agent Enterprise Summit"
+                placeholder="e.g. Enterprise Multi-Agent Summit"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"

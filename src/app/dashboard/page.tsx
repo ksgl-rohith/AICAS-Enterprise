@@ -8,34 +8,33 @@ import {
   CheckCircle2,
   BarChart3,
   Plus,
-  ArrowUpRight,
   FileText,
   Radio,
   ChevronRight,
-  Sparkles,
-  ShieldCheck,
   Zap,
-  Eye,
-  Sliders,
-  Calendar,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { MetricCard } from '@/components/ui/metric-card';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function DashboardPage() {
+  const { activeWorkspace } = useWorkspace();
   const [brandsCount, setBrandsCount] = useState<number>(0);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [approvalsCount, setApprovalsCount] = useState<number>(0);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
+  const fetchDashboardData = (wsId?: string) => {
+    setLoading(true);
+    const workspaceIdParam = wsId || activeWorkspace?.id || 'tenant-default';
+
     Promise.all([
-      fetch('/api/brands').then((res) => res.json()),
-      fetch('/api/campaigns').then((res) => res.json()),
-      fetch('/api/approvals').then((res) => res.json()),
-      fetch('/api/analytics').then((res) => res.json()),
+      fetch(`/api/brands?workspaceId=${workspaceIdParam}`).then((res) => res.json()),
+      fetch(`/api/campaigns?workspaceId=${workspaceIdParam}`).then((res) => res.json()),
+      fetch(`/api/approvals?workspaceId=${workspaceIdParam}`).then((res) => res.json()),
+      fetch(`/api/analytics?workspaceId=${workspaceIdParam}`).then((res) => res.json()),
     ])
       .then(([brandsData, campaignsData, approvalsData, analyticsData]) => {
         setBrandsCount(Array.isArray(brandsData) ? brandsData.length : 0);
@@ -49,13 +48,26 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchDashboardData(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchDashboardData(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
 
   return (
     <div className="space-y-8">
       {/* Operational Header */}
       <PageHeader
-        eyebrow="Autonomous Content Command Center"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Executive Operations Dashboard"
         description="Orchestrate brand knowledge, multi-agent campaign generation, deterministic compliance review, and live social publishing."
         actions={
@@ -129,7 +141,7 @@ export default function DashboardPage() {
               <span>Campaign Lifecycle Pipeline</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Multi-agent orchestration workflow stages
+              Multi-agent orchestration workflow stages for {activeWorkspace?.code || 'Active Workspace'}
             </p>
           </div>
           <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 flex items-center gap-1.5">
@@ -235,7 +247,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-white">Active Social Campaigns</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Operational status and content item counts</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Campaigns scoped to {activeWorkspace?.name || 'Active Workspace'}</p>
           </div>
           <Link
             href="/campaigns"
@@ -246,8 +258,10 @@ export default function DashboardPage() {
         </div>
 
         {campaigns.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs">
-            No active campaigns yet. Click Launch Campaign Wizard to create one.
+          <div className="text-center py-12 text-slate-500 dark:text-slate-400 text-xs bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+            <Megaphone className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+            <p className="font-semibold text-slate-700 dark:text-slate-300">No campaigns found for {activeWorkspace?.name}</p>
+            <p className="text-[11px] text-slate-500 mt-1">Launch the Campaign Wizard to generate your first social campaign in this workspace.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

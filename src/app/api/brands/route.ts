@@ -1,11 +1,22 @@
 import { brandDeduplicationService } from '@/lib/brand/brand-deduplication-service';
 import { DomainNormalizer } from '@/lib/brand/domain-normalizer';
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId');
+
+    let whereClause: any = undefined;
+    if (workspaceId) {
+      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
+      whereClause = { id: { in: allowedBrandIds } };
+    }
+
     const brands = await db.brand.findMany({
+      where: whereClause,
       include: {
         _count: {
           select: {
@@ -23,7 +34,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const user = await db.user.findFirst();

@@ -5,7 +5,44 @@ export type FieldSource = 'HUMAN_CONFIRMED' | 'HIGH_CONFIDENCE_APPROVED_SOURCE' 
 export interface PrecedenceField<T> {
   value: T;
   source: FieldSource;
+  confidence?: number;
   updatedAt: string;
+}
+
+export interface BrandVoiceDimensions {
+  personalityTraits: string[];
+  tone: string;
+  sentenceStyle: string;
+  vocabularyStyle: string;
+  technicalDepth: string;
+  emotionalRange: string;
+  authorityLevel: string;
+  formality: string;
+  preferredExpressions: string[];
+  avoidedExpressions: string[];
+  audienceAdaptation: string;
+}
+
+export type BrandRuleCategory =
+  | 'preferred_terminology'
+  | 'claims_restrictions'
+  | 'cta_style'
+  | 'tone_boundaries'
+  | 'product_naming'
+  | 'audience_sensitivity'
+  | 'regulatory'
+  | 'formatting'
+  | 'disclaimers'
+  | 'prohibited_promises';
+
+export interface CategorizedBrandRule {
+  id: string;
+  rule: string;
+  reason: string;
+  evidence: string;
+  confidence: number;
+  category: BrandRuleCategory;
+  source: FieldSource;
 }
 
 export interface StoredBrandDNA {
@@ -15,6 +52,8 @@ export interface StoredBrandDNA {
     industry: PrecedenceField<string>;
     description: PrecedenceField<string>;
   };
+  voice: PrecedenceField<BrandVoiceDimensions>;
+  rules: CategorizedBrandRule[];
   offerings: PrecedenceField<string[]>;
   targetAudience: PrecedenceField<string>;
   prohibitedPhrases: PrecedenceField<string[]>;

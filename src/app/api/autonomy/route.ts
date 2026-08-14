@@ -78,3 +78,45 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message || 'Failed to fetch autonomy metrics' }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { mode, tenantId = 'tenant-default' } = body;
+
+    if (!mode || !['COPILOT', 'APPROVAL_REQUIRED', 'RISK_BASED', 'AUTONOMOUS', 'AUTONOMOUS_CAMPAIGN'].includes(mode)) {
+      return NextResponse.json({ error: 'Invalid autonomy mode specified.' }, { status: 400 });
+    }
+
+    const user = await db.user.findFirst();
+    if (user) {
+      await db.userPreferences.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          defaultApprovalMode: mode,
+        },
+        update: {
+          defaultApprovalMode: mode,
+        },
+      });
+
+      await db.auditEvent.create({
+        data: {
+          tenantId,
+          userId: user.id,
+          category: 'System',
+          severity: 'info',
+          action: 'autonomy.mode.changed',
+          details: `Oversight Execution Mode updated to '${mode}'.`,
+          entityType: 'UserPreferences',
+          entityId: user.id,
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, mode });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to update autonomy mode' }, { status: 500 });
+  }
+}

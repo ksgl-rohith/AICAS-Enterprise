@@ -5,21 +5,30 @@
 @layer base {
   :root {
     --background: #f8fafc;
+    --canvas-bg: #f8fafc;
     --surface: #ffffff;
+    --surface-card: #ffffff;
     --surface-elevated: #ffffff;
+    --surface-inset: #f1f5f9;
     --surface-muted: #f1f5f9;
     --surface-hover: #f1f5f9;
 
     --foreground: #0f172a;
+    --text-primary: #0f172a;
     --foreground-secondary: #334155;
+    --text-secondary: #334155;
     --foreground-muted: #64748b;
+    --text-muted: #64748b;
     --foreground-inverted: #ffffff;
 
     --border: #e2e8f0;
+    --border-subtle: #e2e8f0;
     --border-strong: #cbd5e1;
+    --border-focus: #6366f1;
     --focus-ring: #6366f1;
 
     --primary: #4f46e5;
+    --accent-primary: #4f46e5;
     --primary-hover: #4338ca;
     --info: #3b82f6;
     --success: #10b981;
@@ -29,21 +38,30 @@
 
   .dark {
     --background: #090d16;
+    --canvas-bg: #090d16;
     --surface: #0f172a;
+    --surface-card: #0f172a;
     --surface-elevated: #1e293b;
+    --surface-inset: #020617;
     --surface-muted: #020617;
     --surface-hover: #1e293b;
 
     --foreground: #f8fafc;
+    --text-primary: #f8fafc;
     --foreground-secondary: #cbd5e1;
+    --text-secondary: #cbd5e1;
     --foreground-muted: #94a3b8;
+    --text-muted: #94a3b8;
     --foreground-inverted: #0f172a;
 
     --border: #1e293b;
+    --border-subtle: #1e293b;
     --border-strong: #334155;
+    --border-focus: #6366f1;
     --focus-ring: #6366f1;
 
     --primary: #6366f1;
+    --accent-primary: #6366f1;
     --primary-hover: #818cf8;
     --info: #60a5fa;
     --success: #34d399;

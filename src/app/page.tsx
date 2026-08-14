@@ -1,7 +1,9 @@
+'use client';
+
 import React from 'react';
 import { ParticleBackground } from '@/components/showcase/particle-background';
 import { ShowcaseNav } from '@/components/showcase/showcase-nav';
-import { HeroSection } from '@/components/showcase/hero';
+import { Hero } from '@/components/showcase/hero';
 import { ProductOverviewSection } from '@/components/showcase/product-overview';
 import { AppWalkthroughSection } from '@/components/showcase/app-walkthrough';
 import { FeatureShowcaseSection } from '@/components/showcase/feature-showcase';
@@ -17,10 +19,12 @@ import { LiveProductPreviewSection } from '@/components/showcase/live-product-pr
 import { FinalCTASection } from '@/components/showcase/final-cta';
 import Link from 'next/link';
 import { Bot } from 'lucide-react';
+import { useAuth } from '@/components/auth-context';
 
 export default function ShowcasePage() {
+  const { user } = useAuth();
   return (
-    <div className="relative min-h-screen bg-white text-slate-900 selection:bg-indigo-500 selection:text-white font-sans overflow-x-hidden">
+    <div className="relative min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white font-sans overflow-x-hidden transition-colors duration-200">
       {/* Background Interactive Particle Canvas */}
       <ParticleBackground />
 
@@ -28,9 +32,9 @@ export default function ShowcasePage() {
       <ShowcaseNav />
 
       {/* Main Content Assembly */}
-      <main className="relative z-10 space-y-12">
+      <main className="relative z-10 space-y-12 pt-20">
         {/* Section 1: Hero */}
-        <HeroSection />
+        <Hero />
 
         {/* Section 2: Product Overview */}
         <ProductOverviewSection />
@@ -73,37 +77,37 @@ export default function ShowcasePage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-200 bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 text-xs text-slate-600">
+      <footer className="relative z-10 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 py-12 px-4 sm:px-6 lg:px-8 text-xs text-slate-600 dark:text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
               <Bot className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-bold text-slate-900 block">AICAS Enterprise</span>
-              <span className="text-[10px] text-slate-500 font-medium">Autonomous Multi-Agent Content Operating System</span>
+              <span className="font-bold text-slate-900 dark:text-white block">AICAS Enterprise</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Autonomous Multi-Agent Content Operating System</span>
             </div>
           </div>
 
           <div className="flex items-center gap-6 font-medium">
-            <Link href="/dashboard" className="hover:text-indigo-600 transition-colors">
-              Launch Application
+            <Link href={user ? '/dashboard' : '/login'} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+              {user ? 'Open Studio Workspace' : 'Launch Application'}
             </Link>
-            <Link href="/brands" className="hover:text-indigo-600 transition-colors">
+            <Link href="/brands" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
               Brand Profiles
             </Link>
-            <Link href="/campaigns" className="hover:text-indigo-600 transition-colors">
+            <Link href="/campaigns" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
               Campaign Wizard
             </Link>
-            <Link href="/approvals" className="hover:text-indigo-600 transition-colors">
+            <Link href="/approvals" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
               Quality Council
             </Link>
-            <Link href="/analytics" className="hover:text-indigo-600 transition-colors">
+            <Link href="/analytics" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
               Analytics
             </Link>
           </div>
 
-          <div className="text-right text-[10px] text-slate-500 font-mono">
+          <div className="text-right text-[10px] text-slate-500 dark:text-slate-400 font-mono">
             © 2026 AICAS Enterprise. All rights reserved. • Controlled Autonomy Mode Active
           </div>
         </div>

@@ -4,6 +4,8 @@ import { copywritingAgent } from '@/lib/ai/copywriting-agent';
 import { reviewAgent } from '@/lib/ai/review-agent';
 import { schedulingAgent } from '@/lib/ai/scheduling-agent';
 import { auditService } from '@/lib/services/audit-service';
+import { autonomyEngine } from '@/lib/governance/autonomy-engine';
+import { approvalService } from '@/lib/approval/approval-service';
 
 export type CampaignLifecycleState =
   | 'draft'
@@ -84,9 +86,19 @@ export class CampaignLifecycleOrchestrator {
   }
 
   /**
-   * Approve strategy and automatically trigger Content Planning -> Post Generation -> Quality Review -> Scheduling
+   * Approve strategy and trigger Content Planning -> Post Generation -> Quality Review -> Autonomy Policy Evaluation -> Scheduling / Approval Queue
    */
-  public async approveStrategy(campaignId: string, reviewerId?: string): Promise<{ success: boolean; campaign: any; contentCount: number }> {
+  public async approveStrategy(
+    campaignId: string,
+    reviewerId?: string
+  ): Promise<{
+    success: boolean;
+    campaign: any;
+    contentCount: number;
+    autoScheduledCount: number;
+    pendingApprovalCount: number;
+    oversightMode: string;
+  }> {
     const campaign = await db.campaign.findUnique({
       where: { id: campaignId },
       include: { brand: true, strategy: true },
@@ -96,15 +108,34 @@ export class CampaignLifecycleOrchestrator {
       throw new Error('Cannot approve strategy: Strategy record does not exist.');
     }
 
+    const oversightMode = (campaign.oversightMode || 'APPROVAL_REQUIRED').toUpperCase().replace(/[\s-]+/g, '_');
+
     // 1. Mark Strategy APPROVED and Campaign STRATEGY_APPROVED
     await db.campaignStrategy.update({
       where: { campaignId },
       data: { status: 'APPROVED' },
     });
 
+    // Record audit: strategy.approved
+    await auditService.recordEvent({
+      tenantId: 'tenant-default',
+      brandId: campaign.brandId,
+      campaignId: campaign.id,
+      category: 'Campaign',
+      action: 'strategy.approved',
+      details: `Strategy approved for campaign '${campaign.name}' (Oversight Mode: ${oversightMode}).`,
+      entityType: 'CampaignStrategy',
+      entityId: campaign.strategy.id,
+      metadata: {
+        version: campaign.strategy.version,
+        oversightMode,
+        reviewerId: reviewerId || 'SYSTEM',
+      },
+    });
+
     await this.transitionState(campaignId, 'strategy_approved', reviewerId);
 
-    // 2. Transition to PLANNING & run Content Planning Agent
+    // 2. Transition to PLANNING & prepare topic mix
     await this.transitionState(campaignId, 'planning', reviewerId);
 
     const pillars = JSON.parse(campaign.strategy.contentPillarsJson || '[]');
@@ -120,6 +151,8 @@ export class CampaignLifecycleOrchestrator {
     // 3. Transition to GENERATING & create content items
     await this.transitionState(campaignId, 'generating', reviewerId);
     const createdItems = [];
+    let autoScheduledCount = 0;
+    let pendingApprovalCount = 0;
 
     for (let i = 0; i < topicsToGenerate.length; i++) {
       const topic = topicsToGenerate[i];
@@ -148,7 +181,7 @@ export class CampaignLifecycleOrchestrator {
       if (agentRes.output) {
         const out = agentRes.output;
 
-        // Create ContentItem
+        // Create ContentItem in DRAFT state
         const item = await db.contentItem.create({
           data: {
             campaignId: campaign.id,
@@ -158,7 +191,7 @@ export class CampaignLifecycleOrchestrator {
             contentPillar: out.contentPillar,
             format: out.format,
             defaultCTA: campaign.offerCTA,
-            status: 'APPROVED',
+            status: 'DRAFT',
           },
         });
 
@@ -182,7 +215,7 @@ export class CampaignLifecycleOrchestrator {
         }
 
         // Execute Quality Council Evaluation
-        await reviewAgent.execute({
+        const qcRes = await reviewAgent.execute({
           taskId: `task_qc_${item.id}_${Date.now()}`,
           tenantId: 'tenant-default',
           brandId: campaign.brandId,
@@ -193,49 +226,152 @@ export class CampaignLifecycleOrchestrator {
           },
         });
 
-        // 4. Automatically Schedule Content Item
-        const mainChannel = (channels[0] || 'linkedin') as 'linkedin' | 'facebook' | 'instagram' | 'telegram';
-        const schedRes = await schedulingAgent.execute({
-          taskId: `task_sched_${item.id}_${Date.now()}`,
+        const fullText = `${out.title} ${out.variants.map((v: any) => `${v.headline || ''} ${v.bodyText || ''}`).join(' ')}`;
+        const reviewRecord = await db.reviewResult.findUnique({
+          where: { contentItemId: item.id },
+        });
+
+        const riskScore = reviewRecord ? reviewRecord.factualRiskScore : (qcRes.output?.factualRiskScore ?? 10);
+        const factualConfidence = reviewRecord ? reviewRecord.confidence : (qcRes.confidence ?? 0.95);
+        const brandDnaScore = reviewRecord ? reviewRecord.brandScore : (qcRes.output?.brandScore ?? 90);
+
+        // Create Approval Request
+        await approvalService.createApprovalRequest({
           tenantId: 'tenant-default',
           brandId: campaign.brandId,
           campaignId: campaign.id,
-          input: {
-            brandId: campaign.brandId,
-            campaignId: campaign.id,
-            channel: mainChannel,
-            startDate: campaign.startDate.toISOString(),
-            endDate: campaign.endDate.toISOString(),
-          },
+          contentItemId: item.id,
+          text: fullText,
+          riskScore,
+          factualConfidence,
+          brandDnaScore,
+          oversightMode: oversightMode as any,
+          creatorUserId: reviewerId,
         });
 
-        // Persist Schedule records in DB
-        if (schedRes.output && schedRes.output.recommendedSlots) {
-          for (const slot of schedRes.output.recommendedSlots) {
-            await db.schedule.create({
-              data: {
-                campaignId: campaign.id,
-                contentItemId: item.id,
-                channel: slot.channel || mainChannel,
-                scheduledTime: new Date(slot.proposedTime),
-                timezone: 'UTC',
-                status: 'SCHEDULED',
-              },
-            });
+        // Evaluate Publishing Autonomy
+        const autonomyEval = await autonomyEngine.evaluatePublishingAutonomy({
+          tenantId: 'tenant-default',
+          brandId: campaign.brandId,
+          campaignId: campaign.id,
+          contentItemId: item.id,
+          oversightMode: oversightMode as any,
+          riskScore,
+          factualConfidence,
+          brandScore: brandDnaScore,
+          duplicateSimilarity: 0.05,
+          contentType: format,
+          connectorStatus: 'CONNECTED',
+          availableBudget: true,
+        });
+
+        const canAutoPublish = autonomyEval.canAutoPublish;
+
+        if (canAutoPublish) {
+          // Auto-approve content item
+          await db.contentItem.update({
+            where: { id: item.id },
+            data: { status: 'APPROVED' },
+          });
+
+          // Automatically schedule
+          const mainChannel = (channels[0] || 'linkedin') as 'linkedin' | 'facebook' | 'instagram' | 'telegram';
+          const schedRes = await schedulingAgent.execute({
+            taskId: `task_sched_${item.id}_${Date.now()}`,
+            tenantId: 'tenant-default',
+            brandId: campaign.brandId,
+            campaignId: campaign.id,
+            input: {
+              brandId: campaign.brandId,
+              campaignId: campaign.id,
+              channel: mainChannel,
+              startDate: campaign.startDate.toISOString(),
+              endDate: campaign.endDate.toISOString(),
+            },
+          });
+
+          if (schedRes.output && schedRes.output.recommendedSlots) {
+            for (const slot of schedRes.output.recommendedSlots) {
+              await db.schedule.create({
+                data: {
+                  campaignId: campaign.id,
+                  contentItemId: item.id,
+                  channel: slot.channel || mainChannel,
+                  scheduledTime: new Date(slot.proposedTime),
+                  timezone: 'UTC',
+                  status: 'SCHEDULED',
+                },
+              });
+            }
           }
+
+          autoScheduledCount++;
+
+          await auditService.recordEvent({
+            tenantId: 'tenant-default',
+            brandId: campaign.brandId,
+            campaignId: campaign.id,
+            category: 'Content',
+            action: 'content.auto_approved',
+            details: `Content '${item.title}' auto-approved under mode '${oversightMode}'.`,
+            entityType: 'ContentItem',
+            entityId: item.id,
+            metadata: {
+              oversightMode,
+              riskScore,
+              brandDnaScore,
+            },
+          });
+        } else {
+          // Keep in review queue for human review
+          await db.contentItem.update({
+            where: { id: item.id },
+            data: { status: 'IN_REVIEW' },
+          });
+
+          pendingApprovalCount++;
+
+          await auditService.recordEvent({
+            tenantId: 'tenant-default',
+            brandId: campaign.brandId,
+            campaignId: campaign.id,
+            category: 'Content',
+            action: 'content.approval_queued',
+            details: `Content '${item.title}' queued for mandatory human approval. Reasons: ${autonomyEval.reasons.join('; ')}`,
+            entityType: 'ContentItem',
+            entityId: item.id,
+            metadata: {
+              oversightMode,
+              reasons: autonomyEval.reasons,
+              requiresHumanApproval: true,
+            },
+          });
         }
 
         createdItems.push(item);
       }
     }
 
-    // 5. Transition Campaign to SCHEDULED
-    const finalCampaign = await this.transitionState(campaignId, 'scheduled', reviewerId);
+    // 4. Final Campaign State Transition
+    let finalState: CampaignLifecycleState = 'content_approval';
+    if (autoScheduledCount === createdItems.length && createdItems.length > 0) {
+      finalState = 'scheduled';
+    }
+
+    const finalCampaign = await this.transitionState(campaignId, finalState, reviewerId, {
+      oversightMode,
+      autoScheduledCount,
+      pendingApprovalCount,
+      totalContentItems: createdItems.length,
+    });
 
     return {
       success: true,
       campaign: finalCampaign,
       contentCount: createdItems.length,
+      autoScheduledCount,
+      pendingApprovalCount,
+      oversightMode,
     };
   }
 }

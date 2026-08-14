@@ -16,6 +16,7 @@ describe('Controlled Autonomy Engine & Governance Policies', () => {
       contentType: 'text_post',
       connectorStatus: 'CONNECTED',
       availableBudget: true,
+      isFeatureFlagEnabled: false,
     });
 
     expect(res.canAutoPublish).toBe(false);

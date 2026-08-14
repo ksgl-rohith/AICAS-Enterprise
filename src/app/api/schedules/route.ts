@@ -1,13 +1,23 @@
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const campaignId = searchParams.get('campaignId');
+    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId');
+
+    let whereClause: any = {};
+    if (campaignId) {
+      whereClause.campaignId = campaignId;
+    } else if (workspaceId) {
+      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
+      whereClause.campaign = { brandId: { in: allowedBrandIds } };
+    }
 
     const schedules = await db.schedule.findMany({
-      where: campaignId ? { campaignId } : undefined,
+      where: whereClause,
       include: {
         campaign: { include: { brand: true } },
         contentItem: { include: { variants: true } },
@@ -22,7 +32,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { contentItemId, channel, scheduledTime, timezone } = body;

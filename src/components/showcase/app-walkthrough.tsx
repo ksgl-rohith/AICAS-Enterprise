@@ -230,17 +230,17 @@ export function AppWalkthroughSection() {
   const activeScreen = screens[activeScreenIndex];
 
   return (
-    <section id="walkthrough" className="py-24 relative overflow-hidden px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-white">
+    <section id="walkthrough" className="py-24 relative overflow-hidden px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       {/* Section Header */}
       <div className="text-center max-w-3xl mx-auto mb-16">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold mb-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold mb-4">
           <Sparkles className="w-3.5 h-3.5" />
           <span>Application Walkthrough</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight mb-6">
+        <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6">
           Inside the AICAS Enterprise Platform
         </h2>
-        <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
+        <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg leading-relaxed">
           Explore the exact workspace pages and modules implemented in the codebase. Every tab represents a functional module built into the platform.
         </p>
       </div>
@@ -257,7 +257,7 @@ export function AppWalkthroughSection() {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 ring-1 ring-indigo-500 scale-[1.02]'
-                  : 'bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -271,26 +271,26 @@ export function AppWalkthroughSection() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         {/* Left Side Details Panel */}
         <div className="lg:col-span-5 flex flex-col justify-between">
-          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl h-full flex flex-col justify-between">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-indigo-950/20 h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-indigo-600 font-mono">
+                <span className="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 font-mono">
                   Screen {activeScreenIndex + 1} of {screens.length}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold">
                   {activeScreen.href}
                 </span>
               </div>
 
-              <h3 className="text-2xl font-bold text-slate-900 mb-3">{activeScreen.name}</h3>
-              <p className="text-slate-600 text-sm leading-relaxed mb-6">{activeScreen.purpose}</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">{activeScreen.name}</h3>
+              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-6">{activeScreen.purpose}</p>
 
               {/* Features Bullet List */}
               <div className="mb-6 space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Key Features</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Key Features</h4>
                 {activeScreen.features.map((feat, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-xs text-slate-700 font-medium">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div key={i} className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                    <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                     <span>{feat}</span>
                   </div>
                 ))}
@@ -299,15 +299,15 @@ export function AppWalkthroughSection() {
 
             <div>
               {/* Business Value Highlight */}
-              <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-xs">
-                <strong className="text-indigo-900 block mb-1 font-semibold">Business Value:</strong>
-                <p className="text-slate-700 leading-snug">{activeScreen.businessValue}</p>
+              <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 text-xs">
+                <strong className="text-indigo-900 dark:text-indigo-300 block mb-1 font-semibold">Business Value:</strong>
+                <p className="text-slate-700 dark:text-slate-300 leading-snug">{activeScreen.businessValue}</p>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <Link
                   href={activeScreen.href}
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 group"
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 group"
                 >
                   <span>Launch this page in App</span>
                   <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -319,28 +319,28 @@ export function AppWalkthroughSection() {
 
         {/* Right Side UI Preview Mockup */}
         <div className="lg:col-span-7">
-          <div className="rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden h-full flex flex-col">
+          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden h-full flex flex-col">
             {/* Browser Header Bar */}
-            <div className="px-4 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-4 py-3 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
                 <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
                 <span className="w-3 h-3 rounded-full bg-emerald-400 inline-block" />
               </div>
-              <div className="px-4 py-1 rounded-md bg-white text-slate-700 text-[11px] font-mono border border-slate-200 flex items-center gap-2 shadow-xs">
-                <span className="text-emerald-600 font-semibold">https://</span>aicas.enterprise{activeScreen.href}
+              <div className="px-4 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[11px] font-mono border border-slate-200 dark:border-slate-800 flex items-center gap-2 shadow-xs">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">https://</span>aicas.enterprise{activeScreen.href}
               </div>
-              <div className="text-[10px] text-slate-500 font-mono">Gemini 2.5 Active</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Gemini 2.5 Active</div>
             </div>
 
             {/* Inner Mockup View */}
-            <div className="p-6 space-y-6 bg-slate-50 flex-1">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+            <div className="p-6 space-y-6 bg-slate-50 dark:bg-slate-950/80 flex-1">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <h4 className="text-lg font-bold text-slate-900">{activeScreen.mockupData.title}</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">AICAS Enterprise v2.5 • Operational</p>
+                  <h4 className="text-lg font-bold text-slate-900 dark:text-white">{activeScreen.mockupData.title}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">AICAS Enterprise v2.5 • Operational</p>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                   {activeScreen.mockupData.badge}
                 </span>
               </div>
@@ -350,24 +350,24 @@ export function AppWalkthroughSection() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {activeScreen.mockupData.kpis?.map((k, i) => (
-                      <div key={i} className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
-                        <div className="text-[10px] text-slate-500 font-medium">{k.label}</div>
-                        <div className="text-base font-bold text-slate-900 mt-1">{k.val}</div>
-                        <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">{k.change}</div>
+                      <div key={i} className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{k.label}</div>
+                        <div className="text-base font-bold text-slate-900 dark:text-white mt-1">{k.val}</div>
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">{k.change}</div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
-                    <div className="text-xs font-bold text-slate-900 mb-3 flex items-center justify-between">
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white mb-3 flex items-center justify-between">
                       <span>Live Audit Event Stream</span>
-                      <span className="text-[10px] text-slate-500 font-mono">/activity</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">/activity</span>
                     </div>
                     <div className="space-y-2">
                       {activeScreen.mockupData.activity?.map((act, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs text-slate-700 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <div key={i} className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 p-2 rounded-lg bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
                           <span className="truncate pr-2">{act.text}</span>
-                          <span className="text-[10px] text-slate-500 font-mono shrink-0">{act.time}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono shrink-0">{act.time}</span>
                         </div>
                       ))}
                     </div>
@@ -377,29 +377,29 @@ export function AppWalkthroughSection() {
 
               {activeScreen.id === 'brands' && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
-                    <div className="text-xs font-bold text-slate-900 mb-2">Ingested Vector Documents (RAG)</div>
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white mb-2">Ingested Vector Documents (RAG)</div>
                     <div className="space-y-2">
                       {activeScreen.mockupData.chunks?.map((c, i) => (
-                        <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-xs">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-indigo-600" />
-                            <span className="text-slate-900 font-semibold">{c.name}</span>
+                            <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <span className="text-slate-900 dark:text-white font-semibold">{c.name}</span>
                           </div>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-600 font-mono">
+                          <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-400 font-mono">
                             <span>{c.size}</span>
-                            <span className="text-indigo-600 font-semibold">{c.chunks} chunks</span>
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-sans font-semibold">{c.status}</span>
+                            <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{c.chunks} chunks</span>
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-sans font-semibold">{c.status}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
-                    <div className="text-xs font-bold text-slate-900">Brand Guardrails & Governance</div>
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">Brand Guardrails & Governance</div>
                     {activeScreen.mockupData.rules?.map((r, i) => (
-                      <div key={i} className="text-xs text-slate-700 p-2 rounded bg-slate-50 border border-slate-200 font-mono">
+                      <div key={i} className="text-xs text-slate-700 dark:text-slate-300 p-2 rounded bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 font-mono">
                         {r}
                       </div>
                     ))}
@@ -409,13 +409,13 @@ export function AppWalkthroughSection() {
 
               {activeScreen.id === 'campaigns' && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
-                    <div className="text-xs font-bold text-slate-900 mb-2">Strategic Content Pillars</div>
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white mb-2">Strategic Content Pillars</div>
                     <div className="space-y-2">
                       {activeScreen.mockupData.pillars?.map((p, i) => (
-                        <div key={i} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-900">{p.name}</span>
-                          <span className="text-indigo-600 text-[11px] font-mono font-semibold">{p.angle}</span>
+                        <div key={i} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-900 dark:text-white">{p.name}</span>
+                          <span className="text-indigo-600 dark:text-indigo-400 text-[11px] font-mono font-semibold">{p.angle}</span>
                         </div>
                       ))}
                     </div>
@@ -426,62 +426,62 @@ export function AppWalkthroughSection() {
               {activeScreen.id === 'approvals' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-4 gap-2">
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center">
-                      <div className="text-[10px] text-slate-500 font-medium">Brand Voice</div>
-                      <div className="text-lg font-bold text-indigo-600 mt-1">96/100</div>
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Brand Voice</div>
+                      <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mt-1">96/100</div>
                     </div>
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center">
-                      <div className="text-[10px] text-slate-500 font-medium">Factual Risk</div>
-                      <div className="text-lg font-bold text-emerald-600 mt-1">4%</div>
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Factual Risk</div>
+                      <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1">4%</div>
                     </div>
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center">
-                      <div className="text-[10px] text-slate-500 font-medium">Compliance</div>
-                      <div className="text-lg font-bold text-emerald-600 mt-1">100%</div>
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Compliance</div>
+                      <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1">100%</div>
                     </div>
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center">
-                      <div className="text-[10px] text-slate-500 font-medium">Originality</div>
-                      <div className="text-lg font-bold text-purple-600 mt-1">98%</div>
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Originality</div>
+                      <div className="text-lg font-bold text-purple-600 dark:text-purple-400 mt-1">98%</div>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium">
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                     ✓ Deterministic Quality Council passed. Content cleared for automated publishing.
                   </div>
                 </div>
               )}
 
               {activeScreen.id === 'calendar' && (
-                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
-                  <div className="text-xs font-bold text-slate-900 mb-2">Upcoming Schedule Queue</div>
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white mb-2">Upcoming Schedule Queue</div>
                   {activeScreen.mockupData.upcoming?.map((u, i) => (
-                    <div key={i} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                    <div key={i} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
                       <div>
-                        <span className="font-semibold text-slate-900 block">{u.title}</span>
-                        <span className="text-[10px] text-indigo-600 font-mono font-semibold">{u.channel}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white block">{u.title}</span>
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">{u.channel}</span>
                       </div>
-                      <span className="text-[11px] text-slate-500 font-mono">{u.time}</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{u.time}</span>
                     </div>
                   ))}
                 </div>
               )}
 
               {activeScreen.id === 'integrations' && (
-                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
-                  <div className="text-xs font-bold text-slate-900 mb-2">Connected OAuth Connectors</div>
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white mb-2">Connected OAuth Connectors</div>
                   {activeScreen.mockupData.connectors?.map((c, i) => (
-                    <div key={i} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-900">{c.platform}</span>
-                      <span className="text-emerald-700 text-[11px] font-mono font-semibold">{c.status}</span>
+                    <div key={i} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-900 dark:text-white">{c.platform}</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 text-[11px] font-mono font-semibold">{c.status}</span>
                     </div>
                   ))}
                 </div>
               )}
 
               {activeScreen.id === 'analytics' && (
-                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
-                  <div className="text-xs font-bold text-slate-900">Top Content Pillar: {activeScreen.mockupData.topPillar}</div>
-                  <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-xs text-indigo-900">
-                    <strong className="block mb-1 text-indigo-950 font-bold">AI Recommendation:</strong>
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">Top Content Pillar: {activeScreen.mockupData.topPillar}</div>
+                  <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200">
+                    <strong className="block mb-1 text-indigo-950 dark:text-indigo-300 font-bold">AI Recommendation:</strong>
                     {activeScreen.mockupData.recommendation}
                   </div>
                 </div>

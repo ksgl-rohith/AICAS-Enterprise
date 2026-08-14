@@ -59,11 +59,12 @@ export function extractAndVerifyClaims(
   const verifiedClaims: VerifiedClaim[] = [];
 
   sentences.forEach((sentence, idx) => {
-    const hasNumberOrPercent = /\d+(?:\.\d+)?%|\$\d+|\d+\s*(?:x|users|customers|percent|billion|million)/i.test(sentence);
+    const isYearOrList = /\b20\d\d\b|^\d+\.\s|\b\d+\s+(?:tips|steps|reasons|clauses|ways|strategies|pillars|points)\b/i.test(sentence);
+    const hasStatisticalAssertion = /\d+(?:\.\d+)?%|\$\d+|\b\d+\s*(?:x|users|customers|percent|billion|million)\b/i.test(sentence) && !isYearOrList;
     const hasFeatureKeyword = /features|includes|supports|provides|guarantees|increases|reduces/i.test(sentence);
-    const isOpinion = /we believe|in our view|our mission|excited to|hope to|strive/i.test(sentence);
+    const isOpinion = /we believe|in our view|our mission|excited to|hope to|strive|why\s+|how\s+|guide\s+to|best\s+practices/i.test(sentence);
 
-    if (isOpinion) {
+    if (isOpinion && !hasStatisticalAssertion) {
       verifiedClaims.push({
         claimId: `claim_${idx + 1}`,
         extractedText: sentence,
@@ -76,8 +77,8 @@ export function extractAndVerifyClaims(
       return;
     }
 
-    const claimType = hasNumberOrPercent ? 'statistic' : hasFeatureKeyword ? 'feature_fact' : 'historical_fact';
-    const isHighRisk = claimType === 'statistic' || sentence.includes('guarantee');
+    const claimType = hasStatisticalAssertion ? 'statistic' : hasFeatureKeyword ? 'feature_fact' : 'historical_fact';
+    const isHighRisk = (claimType === 'statistic' && hasStatisticalAssertion) || sentence.toLowerCase().includes('guarantee');
 
     // Match against evidence
     const matchingEvidence = evidence.filter((ev) => {
@@ -95,7 +96,7 @@ export function extractAndVerifyClaims(
       const topEv = matchingEvidence[0];
       classification = topEv.confidence > 0.8 ? 'supported' : 'partially_supported';
       confidence = topEv.confidence;
-    } else if (hasNumberOrPercent) {
+    } else if (hasStatisticalAssertion) {
       // Numerical claim with zero evidence
       classification = 'unsupported';
       confidence = 0.2;
@@ -143,10 +144,25 @@ export class FactVerificationAgent {
 
     if (hasMaterialClaims) {
       const supportedCount = nonOpinionClaims.filter((c) => c.classification === 'supported').length;
-      overallFactualConfidence = Math.round((supportedCount / nonOpinionClaims.length) * 100) / 100;
-      factualRiskScore = highRiskUnsupported
-        ? 85
-        : Math.round((1 - overallFactualConfidence) * 100);
+      const partiallySupportedCount = nonOpinionClaims.filter((c) => c.classification === 'partially_supported').length;
+      const unsupportedCount = nonOpinionClaims.filter((c) => c.classification === 'unsupported' || c.classification === 'contradictory').length;
+
+      const weightedConfidence = (
+        supportedCount * 1.0 +
+        partiallySupportedCount * 0.85 +
+        (nonOpinionClaims.length - supportedCount - partiallySupportedCount - unsupportedCount) * 0.75
+      ) / nonOpinionClaims.length;
+
+      overallFactualConfidence = Math.round(weightedConfidence * 100) / 100;
+
+      if (highRiskUnsupported) {
+        factualRiskScore = 85;
+      } else if (unsupportedCount > 0) {
+        factualRiskScore = Math.min(60, Math.round((1 - overallFactualConfidence) * 100));
+      } else {
+        factualRiskScore = Math.max(5, Math.round((1 - overallFactualConfidence) * 25));
+      }
+
       rationale = `${nonOpinionClaims.length} factual claims extracted. ${supportedCount} supported by verified evidence.`;
     }
 

@@ -1,73 +1,63 @@
-import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { brandContextPackageBuilder } from '@/lib/ai/brand-context-package';
 
 export async function GET(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const brandId = params.id;
-    const brand = await db.brand.findUnique({
-      where: { id: brandId },
-      include: {
-        knowledgeDocs: true,
-        campaigns: { take: 3, orderBy: { createdAt: 'desc' } },
-      },
-    });
+    const pkg = await brandContextPackageBuilder.buildPackage(brandId);
 
-    if (!brand) {
-      return NextResponse.json({ error: 'Brand profile not found' }, { status: 404 });
+    if (!pkg) {
+      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
     }
 
-    // 1. Extract products/services/offerings
-    const rawProducts = brand.products
-      ? brand.products.split(',').map((p) => p.trim()).filter(Boolean)
-      : [];
+    const offerings = pkg.products.length > 0
+      ? pkg.products
+      : [`${pkg.brandName} Enterprise Platform`, `${pkg.brandName} Solutions`];
 
-    const offerings = rawProducts.length > 0
-      ? rawProducts
-      : [`${brand.name} Core Solutions`, `${brand.name} Strategic Advisory`];
+    const targetAudiences = pkg.targetAudience
+      ? pkg.targetAudience.split(',').map((a) => a.trim()).filter(Boolean)
+      : ['Enterprise Decision Makers', 'Executive Leaders', 'Marketing Managers'];
 
-    // 2. Extract target audience options
-    const rawAudience = brand.targetAudience || '';
-    const audienceParts = rawAudience.split(/[,;\n]/).map((a) => a.trim()).filter(Boolean);
-    const targetAudiences = audienceParts.length > 0
-      ? [rawAudience, ...audienceParts]
-      : ['Enterprise Executive Decision Makers', 'Department Directors & Team Leads'];
+    const defaultOffer = offerings[0] || 'Enterprise Solutions';
+    const defaultAudience = targetAudiences[0] || 'Enterprise Decision Makers';
+    const defaultCTA = pkg.defaultCTA || 'Request Enterprise Demo & Consultation';
 
-    // 3. Extract CTA options
-    const defaultCTA = brand.defaultCTA || 'Learn More';
-    const ctas = Array.from(
-      new Set([
-        defaultCTA,
-        `Schedule a ${brand.industry.includes('Legal') ? 'Legal Consultation' : 'Demo'}`,
-        'Download Executive Whitepaper',
-        'Request Consultation & Trial',
-        'Explore Enterprise Solutions',
-      ])
-    );
+    const ctas = Array.from(new Set([
+      defaultCTA,
+      `Schedule a ${pkg.brandName} Strategy Session`,
+      `Explore ${defaultOffer} Capabilities`,
+      'Request Custom Enterprise Proposal',
+    ]));
 
-    // 4. Extract content pillars
     const pillars = [
-      `${brand.industry} Best Practices`,
-      'Product & Service Innovation',
-      'Client Success & Case Insights',
-      'Regulatory & Quality Compliance',
+      { name: 'Product Innovation & Leadership', angle: 'Highlighting technological advantage and core capabilities' },
+      { name: 'Customer Success & Outcomes', angle: 'Verifiable case insights and ROI metrics' },
+      { name: 'Industry Intelligence & Compliance', angle: 'Thought leadership and standards governance' },
+    ];
+
+    const suggestedCampaignNames = [
+      `${pkg.brandName} ${defaultOffer} Leadership Summit`,
+      `${pkg.brandName} Enterprise ${pkg.industry} Initiative`,
+      `Accelerating ${defaultOffer} Impact`,
     ];
 
     return NextResponse.json({
-      brandId: brand.id,
-      brandName: brand.name,
-      industry: brand.industry,
+      brandName: pkg.brandName,
+      industry: pkg.industry,
       offerings,
       targetAudiences,
       ctas,
       pillars,
-      defaultOffer: offerings[0] || `${brand.name} Solutions`,
-      defaultAudience: audienceParts[0] || rawAudience || 'Enterprise Decision Makers',
+      defaultOffer,
+      defaultAudience,
       defaultCTA,
+      suggestedCampaignNames,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error generating brand suggestions:', error);
+    return NextResponse.json({ error: 'Failed to fetch brand suggestions' }, { status: 500 });
   }
 }

@@ -5,8 +5,10 @@ import { CalendarDays, Plus, RefreshCw, Send, ExternalLink } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function CalendarPage() {
+  const { activeWorkspace } = useWorkspace();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [approvedItems, setApprovedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,10 +21,12 @@ export default function CalendarPage() {
   const [selectedChannel, setSelectedChannel] = useState('linkedin');
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().slice(0, 16));
 
-  const fetchData = () => {
+  const fetchData = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
     Promise.all([
-      fetch('/api/schedules').then((res) => res.json()),
-      fetch('/api/approvals').then((res) => res.json()),
+      fetch(`/api/schedules?workspaceId=${targetWs}`).then((res) => res.json()),
+      fetch(`/api/approvals?workspaceId=${targetWs}`).then((res) => res.json()),
     ])
       .then(([schedData, appData]) => {
         setSchedules(Array.isArray(schedData) ? schedData : []);
@@ -35,8 +39,17 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchData(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
 
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +72,7 @@ export default function CalendarPage() {
       const data = await res.json();
       if (res.ok) {
         setShowModal(false);
-        fetchData();
+        fetchData(activeWorkspace?.id);
       } else {
         alert(data.error || 'Schedule collision or error creating schedule.');
       }
@@ -84,7 +97,7 @@ export default function CalendarPage() {
           window.open(permalink, '_blank', 'noopener,noreferrer');
         }
         alert(`Published successfully! Mode: ${data.result?.isSimulated ? 'Simulated Sandbox' : 'Live API'}. Post ID: ${data.result?.externalPostId}`);
-        fetchData();
+        fetchData(activeWorkspace?.id);
       } else {
         alert(data.error || 'Publishing failed.');
       }
@@ -102,7 +115,7 @@ export default function CalendarPage() {
       const data = await res.json();
       if (res.ok) {
         alert(`Processed ${data.processedCount || 0} due scheduled publications.`);
-        fetchData();
+        fetchData(activeWorkspace?.id);
       }
     } catch {
       alert('Failed to trigger due schedules.');
@@ -114,7 +127,7 @@ export default function CalendarPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Publishing Operations"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Calendar & Schedule Orchestration"
         description="Cadence and timezone-aware publishing schedule. Dispatch through live API connectors or simulated sandbox."
         breadcrumbs={[
@@ -144,11 +157,53 @@ export default function CalendarPage() {
         }
       />
 
+      {/* Unscheduled Approved Content Queue Panel */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Unscheduled Approved Content ({approvedItems.filter((i) => i.status === 'APPROVED').length})
+          </h3>
+          <span className="text-[11px] text-slate-500">Ready to assign publication timestamp</span>
+        </div>
+
+        {approvedItems.filter((i) => i.status === 'APPROVED').length === 0 ? (
+          <p className="text-xs text-slate-400 py-2 italic">All approved items in {activeWorkspace?.name} have been scheduled.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            {approvedItems.filter((i) => i.status === 'APPROVED').map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col justify-between gap-2"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="emerald">APPROVED / UNSCHEDULED</Badge>
+                    <span className="text-[10px] text-slate-400">{item.format}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 dark:text-white line-clamp-1">{item.title}</h4>
+                  <p className="text-[11px] text-slate-500 line-clamp-2">{item.coreIdea}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedItemId(item.id);
+                    setShowModal(true);
+                  }}
+                  className="w-full mt-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  <span>Assign Schedule Date</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Schedule Items Agenda Feed */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Scheduled Publishing Queue ({schedules.length})
+            <CalendarDays className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Scheduled Publishing Queue for {activeWorkspace?.name} ({schedules.length})
           </h2>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Timezone: UTC</span>
         </div>
@@ -158,8 +213,8 @@ export default function CalendarPage() {
         ) : schedules.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
-            title="No Posts Scheduled"
-            description="There are currently no content posts scheduled in the queue."
+            title={`No Posts Scheduled in ${activeWorkspace?.name}`}
+            description="There are currently no content posts scheduled in the queue for this workspace."
             action={
               <button
                 onClick={() => setShowModal(true)}

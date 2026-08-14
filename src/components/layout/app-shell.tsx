@@ -10,7 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isShowcase = pathname === '/';
 
   if (isShowcase) {
-    return <div className="min-h-screen bg-white text-slate-900 selection:bg-indigo-500 selection:text-white font-sans">{children}</div>;
+    return <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-200">{children}</div>;
   }
 
   return (

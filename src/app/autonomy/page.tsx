@@ -103,8 +103,11 @@ export default function AutonomyPage() {
 
       {/* Oversight Mode Selector */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Oversight Execution Mode
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Oversight Execution Mode
+          </span>
+          <span className="text-xs text-slate-400 font-mono">Active Policy Version: v2.5</span>
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
@@ -116,7 +119,19 @@ export default function AutonomyPage() {
           ].map((item) => (
             <div
               key={item.key}
-              onClick={() => setMode(item.key as any)}
+              onClick={async () => {
+                const newMode = item.key as any;
+                setMode(newMode);
+                try {
+                  await fetch('/api/autonomy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: newMode }),
+                  });
+                } catch {
+                  // non-fatal UI state
+                }
+              }}
               className={`p-4 rounded-xl border cursor-pointer transition-all space-y-2 ${
                 mode === item.key
                   ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-slate-900 dark:text-white shadow-sm'
@@ -130,6 +145,20 @@ export default function AutonomyPage() {
               <p className="text-[11px] leading-relaxed">{item.desc}</p>
             </div>
           ))}
+        </div>
+
+        {/* What Does This Mean? Explanation Box */}
+        <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/50 text-xs text-indigo-950 dark:text-indigo-200 space-y-1.5">
+          <div className="font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300">
+            <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span>What does this mean for system execution?</span>
+          </div>
+          <p className="text-[11px] leading-relaxed">
+            {mode === 'COPILOT' && 'AI agents generate strategy and copy proposals, but publishing and scheduling remain strictly manual actions driven by human operators.'}
+            {mode === 'APPROVAL_REQUIRED' && 'AI agents run full preparatory campaign workflows autonomously, but publishing remains blocked until a human reviewer approves each post item.'}
+            {mode === 'RISK_BASED' && 'AI can execute approved low-risk workflow steps automatically, while policy-sensitive actions and high-risk operations still require human oversight.'}
+            {(mode === 'RISK_BASED' || mode === 'AUTONOMOUS_CAMPAIGN') && 'AI executes end-to-end campaign scheduling and publishing within configured policy boundaries, budget limits, and crisis overrides.'}
+          </p>
         </div>
       </div>
 

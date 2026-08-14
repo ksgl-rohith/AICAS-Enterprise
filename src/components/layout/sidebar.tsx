@@ -93,8 +93,11 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+import { useWorkspace } from '@/components/workspace-context';
+
 export function Sidebar() {
   const pathname = usePathname();
+  const { activeWorkspace } = useWorkspace();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -211,7 +214,7 @@ export function Sidebar() {
               <div className="flex items-center gap-2 overflow-hidden">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  ApexAI Solutions
+                  {activeWorkspace?.name || 'ApexAI Enterprise'}
                 </span>
               </div>
               <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />

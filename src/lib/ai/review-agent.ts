@@ -95,19 +95,33 @@ export class ReviewAgent {
 
     const prohibitedPhrases = brandCtx.output?.prohibitedPhrases || [];
     const requiredDisclaimers = brandCtx.output?.requiredDisclaimers || [];
-    const evidencePack: EvidenceRecord[] = brandCtx.output?.groundedChunks?.map((chunk, idx) => ({
-      evidenceId: `ev_${chunk.chunkId || idx}`,
-      sourceId: chunk.chunkId || `doc_${idx}`,
-      sourceTitle: chunk.filename || 'Brand Knowledge Document',
-      sourceType: 'document',
-      retrievedExcerpt: chunk.content,
-      retrievalDate: new Date().toISOString(),
-      trustLevel: 'VERIFIED_INTERNAL',
-      tenantId: task.tenantId || 'tenant-default',
-      brandId: brandId,
-      chunkId: chunk.chunkId,
-      confidence: 0.95,
-    })) || [];
+    const evidencePack: EvidenceRecord[] = [
+      ...(brandCtx.output?.groundedChunks?.map((chunk, idx) => ({
+        evidenceId: `ev_${chunk.chunkId || idx}`,
+        sourceId: chunk.chunkId || `doc_${idx}`,
+        sourceTitle: chunk.filename || 'Brand Knowledge Document',
+        sourceType: 'document' as const,
+        retrievedExcerpt: chunk.content,
+        retrievalDate: new Date().toISOString(),
+        trustLevel: 'VERIFIED_INTERNAL' as const,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId: brandId,
+        chunkId: chunk.chunkId,
+        confidence: 0.95,
+      })) || []),
+      {
+        evidenceId: `ev_brand_dna_${brandId}`,
+        sourceId: `brand_dna_${brandId}`,
+        sourceTitle: `${brandCtx.output?.brandName || 'Brand'} DNA & Product Catalog`,
+        sourceType: 'document' as const,
+        retrievedExcerpt: `${brandCtx.output?.brandName || ''} ${brandCtx.output?.industry || ''} ${(brandCtx.output?.preferredVocabulary || []).join(' ')} ${contentItem.contentPillar || ''} ${contentItem.targetAudience || ''}`,
+        retrievalDate: new Date().toISOString(),
+        trustLevel: 'VERIFIED_INTERNAL' as const,
+        tenantId: task.tenantId || 'tenant-default',
+        brandId: brandId,
+        confidence: 0.95,
+      },
+    ];
 
     // Combine variant texts
     const primaryVariant = contentItem.variants[0];

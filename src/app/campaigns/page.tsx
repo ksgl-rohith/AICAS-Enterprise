@@ -6,25 +6,42 @@ import { Megaphone, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function CampaignsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch('/api/campaigns')
+  const fetchCampaigns = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/campaigns?workspaceId=${targetWs}`)
       .then((res) => res.json())
       .then((data) => {
         setCampaigns(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchCampaigns(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchCampaigns(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Campaign Operations"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Active Campaigns & Strategies"
         description="Multi-agent social media campaigns with grounded AI strategy, multi-channel copy variants, and publishing pipeline."
         breadcrumbs={[
@@ -48,8 +65,8 @@ export default function CampaignsPage() {
       ) : campaigns.length === 0 ? (
         <EmptyState
           icon={Megaphone}
-          title="No Campaigns Created Yet"
-          description="Launch the Multi-step Campaign Wizard to build AI-driven multi-channel social campaigns."
+          title={`No Campaigns in ${activeWorkspace?.name || 'Workspace'}`}
+          description="Launch the Multi-step Campaign Wizard to build AI-driven multi-channel social campaigns for this workspace."
           action={
             <Link
               href="/campaigns/new"
@@ -75,6 +92,7 @@ export default function CampaignsPage() {
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300">{c.description || c.productOrTopic}</p>
                 <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>Brand: <strong className="text-indigo-600 dark:text-indigo-400">{c.brand?.name}</strong></span>
                   <span>Objective: <strong className="text-slate-800 dark:text-slate-200 capitalize">{c.objective?.replace('_', ' ')}</strong></span>
                   <span>Channels: <strong className="text-indigo-600 dark:text-indigo-400 uppercase font-mono">{c.channels}</strong></span>
                   <span>Items: <strong className="text-purple-600 dark:text-purple-400 tabular-nums">{c._count?.contentItems || 0} Posts</strong></span>

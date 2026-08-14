@@ -5,8 +5,10 @@ import { BarChart3, Sparkles, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { MetricCard } from '@/components/ui/metric-card';
 import { Badge } from '@/components/ui/badge';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function AnalyticsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [data, setData] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [modeFilter, setModeFilter] = useState<'all' | 'real' | 'simulated'>('all');
@@ -14,8 +16,10 @@ export default function AnalyticsPage() {
   const [simulating, setSimulating] = useState(false);
   const [generatingRec, setGeneratingRec] = useState(false);
 
-  const fetchAnalytics = () => {
-    fetch(`/api/analytics?mode=${modeFilter}`)
+  const fetchAnalytics = (wsId?: string) => {
+    setLoading(true);
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/analytics?workspaceId=${targetWs}&mode=${modeFilter}`)
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
@@ -33,16 +37,25 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
-    fetchAnalytics();
+    fetchAnalytics(activeWorkspace?.id);
     fetchRecommendations();
-  }, [modeFilter]);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchAnalytics(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [modeFilter, activeWorkspace?.id]);
 
   const handleSimulateMetrics = async () => {
     setSimulating(true);
     try {
       const res = await fetch('/api/analytics/simulate-performance', { method: 'POST' });
       if (res.ok) {
-        fetchAnalytics();
+        fetchAnalytics(activeWorkspace?.id);
       }
     } catch {
       alert('Error simulating performance.');
@@ -72,7 +85,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Intelligence & Growth"
+        eyebrow={`Workspace: ${activeWorkspace?.name || 'Enterprise'}`}
         title="Analytics & Optimization Dashboard"
         description="Normalized social post engagement metrics, attribution analysis, and AI strategic next-post recommendations."
         breadcrumbs={[
@@ -117,8 +130,8 @@ export default function AnalyticsPage() {
           value={(summary.totalImpressions || 0).toLocaleString()}
           subtitle="Cross-channel reach"
           icon={BarChart3}
-          trend="+18.4%"
-          trendPositive={true}
+          trend={summary.totalImpressions > 0 ? '+18.4%' : 'No data'}
+          trendPositive={summary.totalImpressions > 0}
           loading={loading}
         />
         <MetricCard
@@ -196,33 +209,39 @@ export default function AnalyticsPage() {
       {/* Channel Breakdown Grid */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Channel Metrics Breakdown
+          <BarChart3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Channel Metrics Breakdown for {activeWorkspace?.name}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          {Object.entries(channelBreakdown).map(([ch, stats]: [string, any]) => (
-            <div key={ch} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                <span className="font-bold text-slate-900 dark:text-white uppercase">{ch}</span>
-                <Badge variant="indigo">Channel</Badge>
+        {Object.keys(channelBreakdown).length === 0 ? (
+          <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
+            No channel metric snapshots available for {activeWorkspace?.name}. Click "Simulate 7-Day Performance" to populate test snapshots.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            {Object.entries(channelBreakdown).map(([ch, stats]: [string, any]) => (
+              <div key={ch} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <span className="font-bold text-slate-900 dark:text-white uppercase">{ch}</span>
+                  <Badge variant="indigo">Channel</Badge>
+                </div>
+                <div className="space-y-1 text-slate-700 dark:text-slate-300">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Impressions:</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{(stats.impressions || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Engagements:</span>
+                    <span className="font-bold text-purple-600 dark:text-purple-400">{(stats.engagements || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Clicks:</span>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{(stats.clicks || 0).toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1 text-slate-700 dark:text-slate-300">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Impressions:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{(stats.impressions || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Engagements:</span>
-                  <span className="font-bold text-purple-600 dark:text-purple-400">{(stats.engagements || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Clicks:</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{(stats.clicks || 0).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
