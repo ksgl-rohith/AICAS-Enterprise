@@ -152,20 +152,25 @@ export async function POST(req: NextRequest) {
 
     setSessionCookie(response, token);
 
-    await auditService.recordEvent({
-      tenantId: result.workspace.id,
-      category: 'Authentication',
-      severity: 'info',
-      action: 'user.signup',
-      details: `New user '${result.user.email}' registered account and established workspace '${result.workspace.name}' (${result.workspace.code}).`,
-      entityType: 'User',
-      entityId: result.user.id,
-      userId: result.user.id,
-    });
+    try {
+      await auditService.recordEvent({
+        tenantId: result.workspace.id,
+        category: 'Authentication',
+        severity: 'info',
+        action: 'user.signup',
+        details: `New user '${result.user.email}' registered account and established workspace '${result.workspace.name}' (${result.workspace.code}).`,
+        entityType: 'User',
+        entityId: result.user.id,
+        userId: result.user.id,
+      });
+    } catch (auditErr) {
+      console.warn('Non-fatal signup audit log error:', auditErr);
+    }
 
     return response;
   } catch (error: any) {
     console.error('Signup error:', error);
-    return NextResponse.json({ error: 'Registration service error. Please try again.' }, { status: 500 });
+    const message = error?.message || 'Registration service error. Please try again.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

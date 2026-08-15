@@ -14,6 +14,6 @@ function createPrismaClient(): PrismaClient {
 
 export const db = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = db;
-}
+// In serverless environments (Vercel), re-use the connection across lambda invocations
+globalForPrisma.prisma = db;
+

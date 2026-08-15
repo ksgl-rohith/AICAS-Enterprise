@@ -77,22 +77,27 @@ export async function POST(req: NextRequest) {
     // 6. Set HttpOnly session cookie
     setSessionCookie(response, token, rememberMe);
 
-    // 7. Record login audit event
-    await auditService.recordEvent({
-      category: 'Authentication',
-      severity: 'info',
-      action: 'user.login',
-      details: `User '${user.email}' logged in successfully as ${user.role}.`,
-      entityType: 'User',
-      entityId: user.id,
-      userId: user.id,
-    });
+    // 7. Record login audit event safely
+    try {
+      await auditService.recordEvent({
+        category: 'Authentication',
+        severity: 'info',
+        action: 'user.login',
+        details: `User '${user.email}' logged in successfully as ${user.role}.`,
+        entityType: 'User',
+        entityId: user.id,
+        userId: user.id,
+      });
+    } catch (auditErr) {
+      console.warn('Non-fatal login audit log error:', auditErr);
+    }
 
     return response;
   } catch (error: any) {
     console.error('Login service error:', error);
+    const message = error?.message || 'Authentication service error. Please try again.';
     return NextResponse.json(
-      { error: 'Authentication service error. Please try again.' },
+      { error: message },
       { status: 500 }
     );
   }
