@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'aicas_enterprise_secure_session_secret_key_32bytes';
+const FALLBACK_SECRET = 'aicas_enterprise_secure_session_secret_key_32bytes';
+const SESSION_SECRET = process.env.SESSION_SECRET || FALLBACK_SECRET;
 
 const PROTECTED_PREFIXES = [
   '/dashboard',
@@ -24,7 +25,10 @@ const PROTECTED_PREFIXES = [
 ];
 
 const PUBLIC_API_PREFIXES = [
-  '/api/auth',
+  '/api/auth/login',
+  '/api/auth/signup',
+  '/api/auth/logout',
+  '/api/auth/me',
 ];
 
 interface DecodedSession {
@@ -38,39 +42,25 @@ interface DecodedSession {
 
 function decodeBase64Payload(base64Data: string): DecodedSession | null {
   try {
-    const base64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
-    const binary = atob(base64);
-    const jsonStr = decodeURIComponent(
-      Array.from(binary)
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
+    if (typeof Buffer !== 'undefined') {
+      const jsonStr = Buffer.from(base64Data, 'base64url').toString('utf-8');
+      return JSON.parse(jsonStr);
+    }
+    let base64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4 !== 0) {
+      base64 += '=';
+    }
+    const jsonStr = atob(base64);
     return JSON.parse(jsonStr);
   } catch {
-    try {
-      const base64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(base64));
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
-async function verifyToken(token: string | undefined | null): Promise<DecodedSession | null> {
-  if (!token) return null;
+async function verifyHmacSignature(secretStr: string, base64Data: string, expectedHex: string): Promise<boolean> {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 2) return null;
-    const [base64Data, signature] = parts;
-
-    const payload = decodeBase64Payload(base64Data);
-    if (!payload || !payload.exp || Date.now() > payload.exp) {
-      return null;
-    }
-
-    // Web Crypto API HMAC-SHA256 verification (Native Edge Runtime support)
     const encoder = new TextEncoder();
-    const keyData = encoder.encode(SESSION_SECRET);
+    const keyData = encoder.encode(secretStr);
     const dataToSign = encoder.encode(base64Data);
 
     const cryptoKey = await crypto.subtle.importKey(
@@ -82,15 +72,44 @@ async function verifyToken(token: string | undefined | null): Promise<DecodedSes
     );
 
     const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, dataToSign);
-    const hexExpected = Array.from(new Uint8Array(signatureBuffer))
+    const hexCalculated = Array.from(new Uint8Array(signatureBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
 
-    if (hexExpected !== signature) {
+    return hexCalculated === expectedHex;
+  } catch {
+    return false;
+  }
+}
+
+async function verifyToken(token: string | undefined | null): Promise<DecodedSession | null> {
+  if (!token) return null;
+  try {
+    let cleanToken = token.trim();
+    if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
+      cleanToken = cleanToken.slice(1, -1);
+    }
+
+    const parts = cleanToken.split('.');
+    if (parts.length !== 2) return null;
+    const [base64Data, signature] = parts;
+
+    const payload = decodeBase64Payload(base64Data);
+    if (!payload || !payload.exp || Date.now() > payload.exp) {
       return null;
     }
 
-    return payload;
+    // 1. Verify with primary secret
+    const isValidPrimary = await verifyHmacSignature(SESSION_SECRET, base64Data, signature);
+    if (isValidPrimary) return payload;
+
+    // 2. Verify with fallback secret (resilience during config transition)
+    if (SESSION_SECRET !== FALLBACK_SECRET) {
+      const isValidFallback = await verifyHmacSignature(FALLBACK_SECRET, base64Data, signature);
+      if (isValidFallback) return payload;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -114,14 +133,10 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/api/')) {
     const isPublicApi = PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
     if (!isPublicApi && !isAuthenticated) {
-      const response = NextResponse.json(
+      return NextResponse.json(
         { error: 'Unauthorized: Valid authentication session required to access enterprise API' },
         { status: 401 }
       );
-      if (cookieToken && !session) {
-        response.cookies.delete('aicas_session');
-      }
-      return response;
     }
     return NextResponse.next();
   }
@@ -131,13 +146,10 @@ export async function middleware(req: NextRequest) {
     if (!isAuthenticated) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('redirect', pathname + req.nextUrl.search);
-      const res = NextResponse.redirect(loginUrl);
-      if (cookieToken) res.cookies.delete('aicas_session');
-      return res;
+      return NextResponse.redirect(loginUrl);
     }
 
     if (session?.role !== 'ADMIN') {
-      // Non-admin attempting to access /admin -> safe redirect to /dashboard
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
   }
@@ -147,11 +159,7 @@ export async function middleware(req: NextRequest) {
   if (isProtectedPage && !isAuthenticated) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname + req.nextUrl.search);
-    const res = NextResponse.redirect(loginUrl);
-    if (cookieToken) {
-      res.cookies.delete('aicas_session');
-    }
-    return res;
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

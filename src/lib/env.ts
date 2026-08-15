@@ -14,6 +14,7 @@ export const envSchema = z.object({
   ALLOW_PUBLISH_NOW: z.string().transform((v) => v === 'true').default('true'),
   ALLOW_SCHEDULED_LIVE_PUBLISHING: z.string().transform((v) => v === 'true').default('false'),
   FALLBACK_TO_SIMULATOR: z.string().transform((v) => v === 'true').default('true'),
+  SESSION_SECRET: z.string().default('aicas_enterprise_secure_session_secret_key_32bytes'),
   OAUTH_STATE_SECRET: z.string().default('aicas_super_secret_state_token_key_12345'),
   PLATFORM_TOKEN_ENCRYPTION_KEY: z.string().default('39f847291a58c40b2e3194a8f9021c4b'),
   DEFAULT_TENANT_ID: z.string().default('tenant-enterprise-001'),
