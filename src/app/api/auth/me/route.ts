@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/auth';
+import { getSessionFromRequest, clearSessionCookie } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
+    const res = NextResponse.json({ authenticated: false, user: null }, { status: 401 });
+    clearSessionCookie(res);
+    return res;
   }
 
   try {
@@ -13,8 +15,10 @@ export async function GET(req: NextRequest) {
       where: { id: session.userId },
     });
 
-    if (!user) {
-      return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
+    if (!user || (user.status && user.status !== 'ACTIVE')) {
+      const res = NextResponse.json({ authenticated: false, user: null }, { status: 401 });
+      clearSessionCookie(res);
+      return res;
     }
 
     return NextResponse.json({
@@ -28,7 +32,7 @@ export async function GET(req: NextRequest) {
         avatarUrl: user.avatarUrl,
       },
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ authenticated: false, user: null }, { status: 500 });
   }
 }

@@ -155,7 +155,7 @@ export default function CampaignContentStudioPage({ params }: { params: { id: st
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowScheduleModal(true)}
             className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm shadow-emerald-600/30 flex items-center gap-2 transition-all"

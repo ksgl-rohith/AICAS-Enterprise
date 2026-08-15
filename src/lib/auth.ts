@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
-import { auditService } from '@/lib/services/audit-service';
 
-const SESSION_COOKIE_NAME = 'aicas_session';
+export const SESSION_COOKIE_NAME = 'aicas_session';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'aicas_enterprise_secure_session_secret_key_32bytes';
 
 export interface UserSessionPayload {
@@ -16,9 +15,41 @@ export interface UserSessionPayload {
 }
 
 /**
+ * Hash password securely using PBKDF2 with unique cryptographic salt.
+ * Returns salt:hash format.
+ */
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+/**
+ * Verify password against stored salt:hash string using timing-safe comparison.
+ */
+export function verifyPassword(password: string, storedHash: string | null | undefined): boolean {
+  if (!password || !storedHash) return false;
+  try {
+    const parts = storedHash.split(':');
+    if (parts.length !== 2) return false;
+    const [salt, expectedHash] = parts;
+    const computedHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+    const expectedBuffer = Buffer.from(expectedHash, 'hex');
+    const computedBuffer = Buffer.from(computedHash, 'hex');
+    if (expectedBuffer.length !== computedBuffer.length) return false;
+    return crypto.timingSafeEqual(expectedBuffer, computedBuffer);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Sign session payload to token string.
  */
-export function signSessionPayload(payload: Omit<UserSessionPayload, 'createdAt' | 'exp'>, rememberMe: boolean = false): string {
+export function signSessionPayload(
+  payload: Omit<UserSessionPayload, 'createdAt' | 'exp'>,
+  rememberMe: boolean = false
+): string {
   const now = Date.now();
   const duration = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
   const fullPayload: UserSessionPayload = {
@@ -52,7 +83,11 @@ export function verifySessionToken(token: string | undefined | null): UserSessio
       .update(base64Data)
       .digest('hex');
 
-    if (signature !== expectedSig) return null;
+    const expectedBuffer = Buffer.from(expectedSig, 'hex');
+    const signatureBuffer = Buffer.from(signature, 'hex');
+
+    if (expectedBuffer.length !== signatureBuffer.length) return null;
+    if (!crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) return null;
 
     const jsonStr = Buffer.from(base64Data, 'base64url').toString('utf-8');
     const payload: UserSessionPayload = JSON.parse(jsonStr);
@@ -116,22 +151,51 @@ export function clearSessionCookie(res: NextResponse) {
 }
 
 /**
- * Fetch or seed default user record from database.
+ * Find user by email strictly from database.
  */
-export async function getOrCreateUser(email: string, name?: string, role?: string) {
-  let user = await db.user.findUnique({
+export async function findUserByEmail(email: string) {
+  if (!email) return null;
+  return await db.user.findUnique({
     where: { email: email.toLowerCase().trim() },
   });
+}
 
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: email.toLowerCase().trim(),
-        name: name || email.split('@')[0],
-        role: role || (email.includes('admin') ? 'ADMIN' : 'MARKETING_MANAGER'),
+/**
+ * Find user by ID strictly from database.
+ */
+export async function findUserById(id: string) {
+  if (!id) return null;
+  return await db.user.findUnique({
+    where: { id },
+  });
+}
+
+/**
+ * Create a new user with standard role and hashed password.
+ */
+export async function createUserAccount(params: {
+  email: string;
+  name: string;
+  password?: string;
+  role?: string;
+}) {
+  const normalizedEmail = params.email.toLowerCase().trim();
+  const passwordHash = params.password ? hashPassword(params.password) : null;
+
+  return await db.user.create({
+    data: {
+      email: normalizedEmail,
+      name: params.name || normalizedEmail.split('@')[0],
+      role: params.role || 'MARKETING_MANAGER',
+      passwordHash,
+      status: 'ACTIVE',
+      preferences: {
+        create: {
+          theme: 'system',
+          density: 'comfortable',
+          sidebarDefault: 'expanded',
+        },
       },
-    });
-  }
-
-  return user;
+    },
+  });
 }

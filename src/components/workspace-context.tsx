@@ -28,6 +28,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchWorkspaces = async () => {
+    if (!user) {
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch('/api/workspaces');

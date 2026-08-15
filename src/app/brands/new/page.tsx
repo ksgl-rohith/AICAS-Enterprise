@@ -183,8 +183,8 @@ export default function NewBrandPage() {
       </div>
 
       {/* 4-Step Wizard Stepper Bar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { step: 1, title: 'Identity', desc: 'Name & Industry' },
             { step: 2, title: 'Voice & Rules', desc: 'Tone & Disclaimers' },
@@ -218,15 +218,15 @@ export default function NewBrandPage() {
       {currentStep === 1 && (
         <div className="space-y-6">
           {/* Website URL Extractor Card */}
-          <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-4 shadow-xl border border-slate-800 relative overflow-hidden">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-6 rounded-3xl bg-slate-900 text-white space-y-4 shadow-xl border border-slate-800 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-indigo-400" />
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
                   AI Website Intelligence Agent
                 </h2>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 w-fit">
                 website-brand-intelligence-agent
               </span>
             </div>
@@ -235,7 +235,7 @@ export default function NewBrandPage() {
               Enter your corporate website URL. The <strong>Website Brand Intelligence Agent</strong> will safely crawl permitted public pages, extract structured Brand DNA intelligence, and provide evidence confidence scores.
             </p>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <input
                 type="url"
                 placeholder="e.g. https://stripe.com or https://apexai.solutions"
@@ -247,7 +247,7 @@ export default function NewBrandPage() {
                 type="button"
                 onClick={handleWebsiteIngestion}
                 disabled={ingestingUrl}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-indigo-600/30 transition-all shrink-0"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 transition-all shrink-0"
               >
                 {ingestingUrl ? (
                   <>

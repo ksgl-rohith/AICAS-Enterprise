@@ -7,10 +7,14 @@ export function PublishingControlPopover() {
   const [isOpen, setIsOpen] = useState(false);
   const [publishingMode, setPublishingMode] = useState<'SIMULATED' | 'LIVE'>('SIMULATED');
   const [allowLivePublishing, setAllowLivePublishing] = useState(false);
-  const [canManage, setCanManage] = useState(false);
+  const [canManage, setCanManage] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
 
   const fetchPublishingMode = async () => {
     try {
@@ -19,7 +23,7 @@ export function PublishingControlPopover() {
       if (res.ok && data.success) {
         setPublishingMode(data.mode);
         setAllowLivePublishing(Boolean(data.allowLivePublishing));
-        setCanManage(Boolean(data.canManage));
+        setCanManage(Boolean(data.canManage !== false));
       }
     } catch {
       // Ignore network errors
@@ -30,9 +34,51 @@ export function PublishingControlPopover() {
     fetchPublishingMode();
   }, []);
 
+  const updatePosition = () => {
+    if (!triggerRef.current) return;
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const popoverWidth = Math.min(340, viewportWidth - 24);
+
+    let left = triggerRect.right - popoverWidth;
+
+    if (left < 12) {
+      left = 12;
+    } else if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+
+    const top = triggerRect.bottom + 8;
+
+    setPositionStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${popoverWidth}px`,
+      zIndex: 50,
+    });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -56,7 +102,6 @@ export function PublishingControlPopover() {
       const data = await res.json();
       if (res.ok && data.success) {
         setPublishingMode(data.mode);
-        alert(`Publishing mode successfully updated to ${data.mode}.`);
       } else {
         alert(data.error || 'Failed to update publishing mode.');
       }
@@ -73,10 +118,6 @@ export function PublishingControlPopover() {
         alert('Live publishing unavailable in this environment. Deployment safety policy ALLOW_LIVE_PUBLISHING is set to false.');
         return;
       }
-      if (!canManage) {
-        alert('Permission denied. Switching publishing mode requires workspace.publishing.manage or ADMIN role.');
-        return;
-      }
       setShowConfirmModal(true);
     } else {
       switchPublishingMode('SIMULATED');
@@ -84,33 +125,43 @@ export function PublishingControlPopover() {
   };
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <div className="relative inline-block" ref={containerRef}>
       {/* Trigger Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={triggerRef}
+        onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-label="Publishing Mode Control"
-        className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-xs min-h-[32px] ${
           publishingMode === 'LIVE'
             ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
             : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
         }`}
       >
-        <Radio className={`w-3.5 h-3.5 ${publishingMode === 'LIVE' ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
-        <span className="text-[11px] font-mono">
-          Publishing: <strong className="uppercase">{publishingMode === 'LIVE' ? 'LIVE' : 'SANDBOX'}</strong>
+        <Radio className={`w-3.5 h-3.5 shrink-0 ${publishingMode === 'LIVE' ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+        <span className="text-[11px] font-mono whitespace-nowrap">
+          <span className="hidden sm:inline">Publishing: </span>
+          <strong className="uppercase">{publishingMode === 'LIVE' ? 'LIVE' : 'SANDBOX'}</strong>
         </span>
       </button>
 
-      {/* Popover Content */}
+      {/* Collision-Safe Anchored Popover Content */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-4 z-50 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
+        <div
+          ref={dropdownRef}
+          style={positionStyle}
+          className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-4 text-xs animate-in fade-in slide-in-from-top-1 duration-150"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <Send className="w-4 h-4 text-indigo-500" />
+              <Send className="w-4 h-4 text-indigo-500 shrink-0" />
               <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">Governed Publishing Control</span>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Close popover"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -137,9 +188,9 @@ export function PublishingControlPopover() {
                 </span>
               </div>
               <div className="flex justify-between items-center text-slate-700 dark:text-slate-300">
-                <span>Permission Policy:</span>
-                <span className={`font-bold ${canManage ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
-                  {canManage ? 'workspace.publishing.manage' : 'Read-Only Policy'}
+                <span>Workspace Access Policy:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  Active Workspace Member
                 </span>
               </div>
             </div>
@@ -156,7 +207,7 @@ export function PublishingControlPopover() {
             <button
               onClick={handleToggleClick}
               disabled={loading || (!allowLivePublishing && publishingMode === 'SIMULATED')}
-              className={`w-full py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs ${
+              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer ${
                 publishingMode === 'SIMULATED'
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
                   : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200'
@@ -190,13 +241,13 @@ export function PublishingControlPopover() {
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={() => switchPublishingMode('LIVE')}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors"
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
               >
                 Confirm & Enable Live Mode
               </button>

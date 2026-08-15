@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { ParticleBackground } from '@/components/showcase/particle-background';
 import { ShowcaseNav } from '@/components/showcase/showcase-nav';
 import { Hero } from '@/components/showcase/hero';
@@ -9,17 +10,43 @@ import { AppWalkthroughSection } from '@/components/showcase/app-walkthrough';
 import { FeatureShowcaseSection } from '@/components/showcase/feature-showcase';
 import { ContentGallerySection } from '@/components/showcase/content-gallery';
 import { AgentShowcaseSection } from '@/components/showcase/agent-showcase';
-import { ExpandedIntelligenceSection } from '@/components/showcase/expanded-intelligence-section';
-import { EnterpriseWorkflowSection } from '@/components/showcase/enterprise-workflow';
-import { AnalyticsShowcaseSection } from '@/components/showcase/analytics-showcase';
-import { PublishingShowcaseSection } from '@/components/showcase/publishing-showcase';
-import { TechArchitectureSection } from '@/components/showcase/tech-architecture';
-import { WhyEnterprisesSection } from '@/components/showcase/why-enterprises';
-import { LiveProductPreviewSection } from '@/components/showcase/live-product-preview';
-import { FinalCTASection } from '@/components/showcase/final-cta';
 import Link from 'next/link';
 import { Bot } from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
+
+// Lazy-load below-the-fold showcase sections for faster initial hydration and render
+const ExpandedIntelligenceSection = dynamic(
+  () => import('@/components/showcase/expanded-intelligence-section').then((m) => m.ExpandedIntelligenceSection),
+  { ssr: true }
+);
+const EnterpriseWorkflowSection = dynamic(
+  () => import('@/components/showcase/enterprise-workflow').then((m) => m.EnterpriseWorkflowSection),
+  { ssr: true }
+);
+const AnalyticsShowcaseSection = dynamic(
+  () => import('@/components/showcase/analytics-showcase').then((m) => m.AnalyticsShowcaseSection),
+  { ssr: true }
+);
+const PublishingShowcaseSection = dynamic(
+  () => import('@/components/showcase/publishing-showcase').then((m) => m.PublishingShowcaseSection),
+  { ssr: true }
+);
+const TechArchitectureSection = dynamic(
+  () => import('@/components/showcase/tech-architecture').then((m) => m.TechArchitectureSection),
+  { ssr: true }
+);
+const WhyEnterprisesSection = dynamic(
+  () => import('@/components/showcase/why-enterprises').then((m) => m.WhyEnterprisesSection),
+  { ssr: true }
+);
+const LiveProductPreviewSection = dynamic(
+  () => import('@/components/showcase/live-product-preview').then((m) => m.LiveProductPreviewSection),
+  { ssr: true }
+);
+const FinalCTASection = dynamic(
+  () => import('@/components/showcase/final-cta').then((m) => m.FinalCTASection),
+  { ssr: true }
+);
 
 export default function ShowcasePage() {
   const { user } = useAuth();

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { getSessionFromRequest } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -86,10 +87,12 @@ export async function POST(req: NextRequest) {
       data: { status: 'SCHEDULED' },
     });
 
-    const user = await db.user.findFirst();
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
+
     await db.auditEvent.create({
       data: {
-        userId: user?.id,
+        userId: userId || undefined,
         brandId: contentItem.campaign.brandId,
         campaignId: contentItem.campaignId,
         action: 'SCHEDULED',

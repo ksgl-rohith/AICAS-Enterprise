@@ -2,6 +2,7 @@ import { brandDeduplicationService } from '@/lib/brand/brand-deduplication-servi
 import { DomainNormalizer } from '@/lib/brand/domain-normalizer';
 import { db } from '@/lib/db';
 import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { getSessionFromRequest } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -36,12 +37,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const user = await db.user.findFirst();
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
 
-    if (!user) {
-      return NextResponse.json({ error: 'No user found' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required to create brand profile' }, { status: 401 });
     }
+
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 });
+    }
+
+    const body = await req.json();
 
     const websiteUrl = body.websiteUrl || body.originalWebsiteUrl || null;
     const normalized = DomainNormalizer.normalize(websiteUrl);
@@ -64,6 +72,7 @@ export async function POST(req: NextRequest) {
     const brand = await db.brand.create({
       data: {
         userId: user.id,
+        workspaceId: body.workspaceId || body.tenantId || null,
         name: body.name,
         industry: body.industry || 'Technology',
         description: body.description || '',

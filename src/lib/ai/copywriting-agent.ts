@@ -13,7 +13,7 @@ export const CarouselSlideSchema = z.object({
 });
 
 export const PlatformVariantSchema = z.object({
-  channel: z.enum(['linkedin', 'facebook', 'instagram', 'telegram']),
+  channel: z.string(),
   headline: z.string().optional(),
   hook: z.string(),
   bodyText: z.string(),
@@ -47,7 +47,7 @@ export interface CopywritingInput {
   targetAudience: string;
   format: 'text_post' | 'image_post' | 'carousel' | 'video_script';
   defaultCTA: string;
-  channels: ('linkedin' | 'facebook' | 'instagram' | 'telegram')[];
+  channels: string[];
   archetype?: ContentArchetypeId;
 }
 
@@ -129,15 +129,7 @@ Channels requested: ${task.input.channels.join(', ')}`;
           channel: 'linkedin',
           headline: `${task.input.topicTitle}: Enterprise Insights for ${industry}`,
           hook: `How ${brandName} achieves verifiable results for ${task.input.targetAudience}.`,
-          bodyText: `${brandName} delivers verifiable solutions for ${task.input.targetAudience} across ${industry}.
-
-Key operational priorities:
-1. Practical innovation aligned with ${brandName}'s core capabilities
-2. Streamlined execution focused on quality and compliance
-3. Verifiable outcomes governed by ${brandTone.toLowerCase()} standards
-
-Explore how ${brandName} achieves measurable results for ${task.input.topicTitle}.
-${requiredDisclaimers.length > 0 ? `\nNote: ${requiredDisclaimers[0]}` : ''}`,
+          bodyText: `${brandName} delivers verifiable solutions for ${task.input.targetAudience} across ${industry}.\n\nKey operational priorities:\n1. Practical innovation aligned with ${brandName}'s core capabilities\n2. Streamlined execution focused on quality and compliance\n3. Verifiable outcomes governed by ${brandTone.toLowerCase()} standards\n\nExplore how ${brandName} achieves measurable results for ${task.input.topicTitle}.\n${requiredDisclaimers.length > 0 ? `\nNote: ${requiredDisclaimers[0]}` : ''}`,
           ctaText: `${cta}`,
           hashtags: [`#${brandName.replace(/\s+/g, '')}`, `#${industry.replace(/[^a-zA-Z0-9]/g, '')}`, '#IndustryLeadership'],
           altText: `Graphic illustrating ${task.input.topicTitle} workflow for ${brandName}`,
@@ -149,11 +141,7 @@ ${requiredDisclaimers.length > 0 ? `\nNote: ${requiredDisclaimers[0]}` : ''}`,
           channel: 'facebook',
           headline: `Understanding ${task.input.topicTitle} with ${brandName}`,
           hook: `Looking for reliable ${task.input.topicTitle} guidance in the ${industry} sector?`,
-          bodyText: `At ${brandName}, we provide ${task.input.targetAudience} with clear, evidence-backed solutions tailored to your unique requirements.
-
-Read our full guide and connect with our team today.
-
-${requiredDisclaimers.length > 0 ? `\n${requiredDisclaimers[0]}` : ''}`,
+          bodyText: `At ${brandName}, we provide ${task.input.targetAudience} with clear, evidence-backed solutions tailored to your unique requirements.\n\nRead our full guide and connect with our team today.\n\n${requiredDisclaimers.length > 0 ? `\n${requiredDisclaimers[0]}` : ''}`,
           ctaText: `${cta}`,
           hashtags: [`#${brandName.replace(/\s+/g, '')}`, `#${industry.replace(/[^a-zA-Z0-9]/g, '')}`, '#ClientSuccess'],
           altText: `Informational banner graphic for ${brandName} ${task.input.topicTitle}`,
@@ -164,13 +152,7 @@ ${requiredDisclaimers.length > 0 ? `\n${requiredDisclaimers[0]}` : ''}`,
         return {
           channel: 'instagram',
           hook: `3 essential steps to master ${task.input.topicTitle} in ${industry}`,
-          bodyText: `Swipe through to discover how ${brandName} helps ${task.input.targetAudience} achieve success.
-
-Step 1: Grounded strategy & assessment
-Step 2: Transparent execution & compliance
-Step 3: Measurable long-term outcomes
-
-Link in bio to learn more and contact sales!`,
+          bodyText: `Swipe through to discover how ${brandName} helps ${task.input.targetAudience} achieve success.\n\nStep 1: Grounded strategy & assessment\nStep 2: Transparent execution & compliance\nStep 3: Measurable long-term outcomes\n\nLink in bio to learn more and contact sales!`,
           ctaText: `Link in Bio: ${cta}`,
           hashtags: [`#${brandName.replace(/\s+/g, '')}`, `#${industry.replace(/[^a-zA-Z0-9]/g, '')}`, '#VisualGuide'],
           altText: `Carousel slide deck for ${task.input.topicTitle}`,
@@ -183,13 +165,108 @@ Link in bio to learn more and contact sales!`,
           ],
           evidenceIds,
         };
+      } else if (channel === 'x') {
+        return {
+          channel: 'x',
+          hook: `Enterprise leaders in ${industry} are accelerating results with ${task.input.topicTitle}.`,
+          bodyText: `Here is how ${brandName} delivers verifiable, compliant impact for ${task.input.targetAudience}:
+
+1/ Grounded intelligence backed by verified data
+2/ Deterministic quality controls
+3/ Measurable operational lift
+
+Learn more: ${cta}`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#EnterpriseAI'],
+          altText: `Chart card summarizing ${task.input.topicTitle}`,
+          visualConcept: `Concise high-contrast data chart highlighting key performance metrics for ${brandName}.`,
+          evidenceIds,
+        };
+      } else if (channel === 'threads') {
+        return {
+          channel: 'threads',
+          hook: `Quick insight for ${task.input.targetAudience} navigating ${task.input.topicTitle} in ${industry}:`,
+          bodyText: `At ${brandName}, we see organizations unlock substantial speed and governance by aligning verified workflows with proven frameworks. What is your team's top priority this quarter?`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Discussion'],
+          evidenceIds,
+        };
+      } else if (channel === 'youtube') {
+        return {
+          channel: 'youtube',
+          headline: `${task.input.topicTitle} Explained | ${brandName} Enterprise Overview`,
+          hook: `Welcome to ${brandName}'s executive breakdown of ${task.input.topicTitle}.`,
+          bodyText: `In this video, we explore how ${brandName} empowers ${task.input.targetAudience} across ${industry} with end-to-end governance and verified capabilities.\n\nChapters:\n0:00 Introduction\n1:15 Core Strategy\n3:40 Implementation & Best Practices\n5:20 Conclusion & Next Steps`,
+          ctaText: `Subscribe & ${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#VideoGuide'],
+          evidenceIds,
+        };
+      } else if (channel === 'tiktok') {
+        return {
+          channel: 'tiktok',
+          hook: `3 things every ${industry} leader needs to know about ${task.input.topicTitle} 👇`,
+          bodyText: `Save this video! Here is how ${brandName} helps ${task.input.targetAudience} stay ahead of industry shifts without sacrificing compliance.`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Shorts'],
+          evidenceIds,
+        };
+      } else if (channel === 'pinterest') {
+        return {
+          channel: 'pinterest',
+          headline: `${task.input.topicTitle} Blueprint for ${industry}`,
+          hook: `Visual roadmap to mastering ${task.input.topicTitle} with ${brandName}.`,
+          bodyText: `Discover step-by-step strategies, infographics, and verified frameworks created by ${brandName} for ${task.input.targetAudience}.`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Infographic'],
+          evidenceIds,
+        };
+      } else if (channel === 'reddit') {
+        return {
+          channel: 'reddit',
+          headline: `Analysis: Practical takeaways on ${task.input.topicTitle} for ${industry} practitioners`,
+          hook: `Sharing an objective architectural overview of ${task.input.topicTitle} based on client implementations at ${brandName}.`,
+          bodyText: `As teams scale their operations in ${industry}, three main bottlenecks typically emerge regarding ${task.input.topicTitle}:
+
+1. Governance and auditability
+2. Grounded verification against domain evidence
+3. Streamlined multi-platform execution
+
+Discussion question: How is your organization currently managing these requirements?`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Discussion'],
+          evidenceIds,
+        };
+      } else if (channel === 'quora') {
+        return {
+          channel: 'quora',
+          headline: `How can organizations effectively approach ${task.input.topicTitle} in ${industry}?`,
+          hook: `Answer provided by the ${brandName} enterprise solutions team:`,
+          bodyText: `To achieve measurable and compliant results in ${task.input.topicTitle}, consider three core pillars:
+
+- Continuous Domain Grounding: Ensure every action is traceable to verified brand DNA and legal disclaimers.
+- Multi-Layer Review Governance: Run factual, compliance, and brand alignment checks before publishing.
+- Performance Feedback Loop: Leverage real-time signal tracking to optimize future campaign cycles.
+
+For additional documentation and live demonstrations: ${cta}`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#QnA'],
+          evidenceIds,
+        };
+      } else if (channel === 'wordpress' || channel === 'website') {
+        return {
+          channel: channel as any,
+          headline: `The Executive Guide to ${task.input.topicTitle} for ${industry}`,
+          hook: `Comprehensive insights and strategic guidance from ${brandName}.`,
+          bodyText: `## Overview\n\nIn today's fast-moving ${industry} landscape, ${task.input.targetAudience} must balance agility with strict quality and governance. This article outlines key best practices for navigating ${task.input.topicTitle}.\n\n### Strategic Pillars\n\n1. **Evidence-Based Grounding**: Maintaining verified facts and compliance safeguards across all channels.\n2. **Orchestrated Workflow Execution**: Reducing manual overhead while keeping humans in the loop.\n3. **Deterministic Verification**: Auditing content for factual accuracy and brand safety.\n\n### Next Steps\n\nExplore how ${brandName} can support your organization's goals: [${cta}].`,
+          ctaText: `${cta}`,
+          hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Enterprise'],
+          evidenceIds,
+        };
       } else {
         return {
           channel: 'telegram',
           hook: `[UPDATE] ${task.input.topicTitle}`,
-          bodyText: `Important update for ${task.input.targetAudience}: ${brandName} has published new guidelines on ${task.input.topicTitle} for ${industry}.
-
-Read full breakdown at the link below.`,
+          bodyText: `Important update for ${task.input.targetAudience}: ${brandName} has published new guidelines on ${task.input.topicTitle} for ${industry}.\n\nRead full breakdown at the link below.`,
           ctaText: `${cta}`,
           hashtags: [`#${brandName.replace(/\s+/g, '')}`, '#Updates'],
           altText: `${brandName} update message graphic`,

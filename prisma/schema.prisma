@@ -9,18 +9,21 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      String   @default("MARKETING_MANAGER")
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         String   @default("MARKETING_MANAGER")
+  status       String   @default("ACTIVE")
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  brands     Brand[]
-  approvals  Approval[]
+  brands      Brand[]
+  approvals   Approval[]
   auditEvents AuditEvent[]
   preferences UserPreferences?
+  memberships WorkspaceMembership[]
 }
 
 model UserPreferences {
@@ -62,6 +65,7 @@ model Brand {
   id                  String   @id @default(cuid())
   userId              String
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId         String?
   name                String
   industry            String
   description         String
@@ -766,5 +770,30 @@ model BrandMergeRecord {
   mergedAt           DateTime @default(now())
 }
 
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  description String?
+  industry    String?
+  website     String?
+  companySize String?
+  region      String?  @default("Global")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  memberships WorkspaceMembership[]
+}
 
+model WorkspaceMembership {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("WORKSPACE_OWNER") // 'WORKSPACE_OWNER', 'WORKSPACE_ADMIN', 'MEMBER', 'VIEWER'
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, userId])
+}

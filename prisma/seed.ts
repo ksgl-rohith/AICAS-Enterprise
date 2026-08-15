@@ -1,18 +1,29 @@
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
 
 async function main() {
   console.log('Seeding AICAS Lite database...');
 
-  // 1. Create Demo User
+  // 1. Create Demo User with secure password hash
   const user = await prisma.user.upsert({
     where: { email: 'demo@aicas.ai' },
-    update: {},
+    update: {
+      passwordHash: hashPassword('DemoUserPass@2026'),
+    },
     create: {
       email: 'demo@aicas.ai',
       name: 'Alex Vance',
+      passwordHash: hashPassword('DemoUserPass@2026'),
       role: 'MARKETING_MANAGER',
+      status: 'ACTIVE',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     },
   });

@@ -1,7 +1,8 @@
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionFromRequest } from '@/lib/auth';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const tenantId = searchParams.get('tenantId') || 'tenant-default';
@@ -79,8 +80,9 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const session = getSessionFromRequest(req);
     const body = await req.json();
     const { mode, tenantId = 'tenant-default' } = body;
 
@@ -88,12 +90,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid autonomy mode specified.' }, { status: 400 });
     }
 
-    const user = await db.user.findFirst();
-    if (user) {
+    const userId = session?.userId;
+    if (userId) {
       await db.userPreferences.upsert({
-        where: { userId: user.id },
+        where: { userId },
         create: {
-          userId: user.id,
+          userId,
           defaultApprovalMode: mode,
         },
         update: {
@@ -104,13 +106,13 @@ export async function POST(req: Request) {
       await db.auditEvent.create({
         data: {
           tenantId,
-          userId: user.id,
+          userId,
           category: 'System',
           severity: 'info',
           action: 'autonomy.mode.changed',
           details: `Oversight Execution Mode updated to '${mode}'.`,
           entityType: 'UserPreferences',
-          entityId: user.id,
+          entityId: userId,
         },
       });
     }

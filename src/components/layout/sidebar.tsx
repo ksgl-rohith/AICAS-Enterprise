@@ -29,6 +29,8 @@ import {
   LucideIcon,
   SlidersHorizontal,
 } from 'lucide-react';
+import { useWorkspace } from '@/components/workspace-context';
+import { useAuth } from '@/components/auth-context';
 
 interface NavItem {
   name: string;
@@ -93,14 +95,12 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-import { useWorkspace } from '@/components/workspace-context';
-
 export function Sidebar() {
   const pathname = usePathname();
   const { activeWorkspace } = useWorkspace();
+  const { isAdmin } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     try {
@@ -111,7 +111,6 @@ export function Sidebar() {
     } catch {
       // localStorage fallback
     }
-    setIsLoaded(true);
   }, []);
 
   const toggleCollapsed = () => {
@@ -124,38 +123,54 @@ export function Sidebar() {
     }
   };
 
+  const filteredNavGroups = navGroups.map((group) => {
+    if (group.title === 'Administration') {
+      return {
+        ...group,
+        items: group.items.filter((item) => {
+          if (item.href === '/settings/preferences') {
+            return isAdmin;
+          }
+          return true;
+        }),
+      };
+    }
+    return group;
+  });
+
   return (
     <>
-      {/* Mobile Menu Trigger */}
+      {/* Mobile Menu Trigger Button */}
       <div className="lg:hidden fixed top-3 left-4 z-40">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
-          className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop Overlay */}
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
-          className="lg:hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40"
+          className="lg:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 transition-opacity animate-in fade-in duration-200"
         />
       )}
 
-      {/* Main Sidebar */}
+      {/* Main Responsive Sidebar Drawer */}
       <aside
         aria-label="Main Navigation"
-        className={`fixed lg:sticky top-0 h-screen z-40 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md transition-all duration-200 ease-in-out shrink-0 select-none ${
-          collapsed ? 'w-20' : 'w-64'
+        className={`fixed lg:sticky top-0 h-screen z-40 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md transition-all duration-200 ease-in-out shrink-0 select-none shadow-xl lg:shadow-none ${
+          collapsed ? 'w-20' : 'w-64 max-w-[85vw]'
         } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         {/* Unified Brand Header Component */}
         <div className="h-16 px-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
           <Link
             href="/dashboard"
+            onClick={() => setMobileOpen(false)}
             title="AICAS Enterprise Content OS"
             className={`flex items-center gap-2.5 overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl p-1 transition-opacity ${
               collapsed ? 'justify-center w-full' : ''
@@ -188,6 +203,15 @@ export function Sidebar() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
+
+          {/* Close button inside mobile drawer */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
+            className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Collapsed Expand Toggle */}
@@ -214,7 +238,7 @@ export function Sidebar() {
               <div className="flex items-center gap-2 overflow-hidden">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  {activeWorkspace?.name || 'ApexAI Enterprise'}
+                  {activeWorkspace?.name || 'Active Workspace'}
                 </span>
               </div>
               <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
@@ -224,7 +248,7 @@ export function Sidebar() {
 
         {/* Navigation List */}
         <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
-          {navGroups.map((group) => (
+          {filteredNavGroups.map((group) => (
             <div key={group.title} className="space-y-1">
               {!collapsed && (
                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 py-1">
@@ -242,7 +266,7 @@ export function Sidebar() {
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     title={collapsed ? item.name : undefined}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[40px] ${
                       isActive
                         ? 'bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-600/20'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'

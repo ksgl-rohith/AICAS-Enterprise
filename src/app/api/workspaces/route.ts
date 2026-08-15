@@ -6,48 +6,104 @@ import { auditService } from '@/lib/services/audit-service';
 export async function GET(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
-    const userId = session?.userId;
-    const userRole = session?.role || 'MARKETING_MANAGER';
-
-    // Fetch user from DB
-    let dbUser = userId ? await db.user.findUnique({ where: { id: userId } }) : null;
-    if (!dbUser) {
-      dbUser = await db.user.findFirst();
+    if (!session || !session.userId) {
+      return NextResponse.json({ error: 'Unauthorized: Valid session required to access workspaces' }, { status: 401 });
     }
 
-    const isAdmin = dbUser?.role === 'ADMIN' || userRole === 'ADMIN';
+    const userId = session.userId;
+    const dbUser = await db.user.findUnique({ where: { id: userId } });
+    if (!dbUser || (dbUser.status && dbUser.status !== 'ACTIVE')) {
+      return NextResponse.json({ error: 'Unauthorized: User not found or inactive' }, { status: 401 });
+    }
 
-    // In AICAS Enterprise multi-tenant system:
-    // Admins get access to all active tenant workspaces.
-    // Normal users get access to their assigned workspace(s).
-    const defaultWorkspaces = [
-      {
-        id: 'tenant-default',
-        name: 'ApexAI Enterprise Workspace',
-        code: 'APEX-ENT',
-        description: 'Primary enterprise tenant workspace for AI content orchestration & governance.',
-        role: isAdmin ? 'ADMIN' : 'MANAGER',
-      },
-      {
-        id: 'tenant-legal-002',
-        name: 'Kandvate Legal Advisory Workspace',
-        code: 'KANDVATE-LAW',
-        description: 'Legal & compliance advisory workspace for corporate dispute resolution & contracts.',
-        role: isAdmin ? 'ADMIN' : 'MEMBER',
-      },
-      {
-        id: 'tenant-demo-003',
-        name: 'Sandbox Demo Workspace',
-        code: 'DEMO-SANDBOX',
-        description: 'Isolated test environment for multi-agent experimentation and simulated publishing.',
-        role: isAdmin ? 'ADMIN' : 'MEMBER',
-      },
-    ];
+    const isAdmin = dbUser.role === 'ADMIN' || session.role === 'ADMIN';
 
-    // Filter available workspaces for normal user vs admin
-    const authorizedWorkspaces = isAdmin
-      ? defaultWorkspaces
-      : defaultWorkspaces.slice(0, 1); // Normal user assigned to primary workspace
+    // 1. Fetch real DB memberships for the authenticated user
+    const memberships = await db.workspaceMembership.findMany({
+      where: { userId },
+      include: { workspace: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let authorizedWorkspaces = memberships.map((m) => ({
+      id: m.workspace.id,
+      name: m.workspace.name,
+      code: m.workspace.code,
+      description: m.workspace.description || `${m.workspace.name} Enterprise Workspace`,
+      role: m.role,
+    }));
+
+    // 2. If Platform Admin, also include all other system workspaces
+    if (isAdmin) {
+      const allDbWorkspaces = await db.workspace.findMany({
+        where: {
+          id: { notIn: authorizedWorkspaces.map((w) => w.id) },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const additionalAdminWorkspaces = allDbWorkspaces.map((w) => ({
+        id: w.id,
+        name: w.name,
+        code: w.code,
+        description: w.description || `${w.name} Workspace`,
+        role: 'ADMIN',
+      }));
+
+      // Also include demo fixtures for admin testing
+      const demoFixtures = [
+        {
+          id: 'tenant-default',
+          name: 'ApexAI Enterprise (Demo Testbed)',
+          code: 'DEMO-APEX',
+          description: 'Isolated test environment for multi-agent experimentation and simulated publishing.',
+          role: 'ADMIN',
+        },
+        {
+          id: 'tenant-legal-002',
+          name: 'Kandvate Legal Advisory (Demo)',
+          code: 'DEMO-LAW',
+          description: 'Legal & compliance advisory workspace for corporate dispute resolution.',
+          role: 'ADMIN',
+        },
+      ];
+
+      authorizedWorkspaces = [...authorizedWorkspaces, ...additionalAdminWorkspaces, ...demoFixtures];
+    }
+
+    // 3. Fallback for legacy seeded user if no DB workspace was created yet
+    if (authorizedWorkspaces.length === 0) {
+      // Auto-create personal workspace for existing user
+      const userFirstName = dbUser.name.split(' ')[0] || 'My';
+      const defaultWsName = `${userFirstName}'s Organization`;
+      const defaultCode = `${userFirstName.toUpperCase().slice(0, 6)}-WS`;
+
+      const newWs = await db.workspace.create({
+        data: {
+          name: defaultWsName,
+          code: `${defaultCode}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          description: `Personal enterprise workspace for ${dbUser.name}.`,
+        },
+      });
+
+      const newMembership = await db.workspaceMembership.create({
+        data: {
+          workspaceId: newWs.id,
+          userId: dbUser.id,
+          role: 'WORKSPACE_OWNER',
+        },
+      });
+
+      authorizedWorkspaces = [
+        {
+          id: newWs.id,
+          name: newWs.name,
+          code: newWs.code,
+          description: newWs.description || defaultWsName,
+          role: newMembership.role,
+        },
+      ];
+    }
 
     return NextResponse.json({
       success: true,
@@ -62,6 +118,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
+      return NextResponse.json({ error: 'Unauthorized: Valid session required to switch workspace' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { workspaceId } = body;
 
@@ -69,23 +129,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
     }
 
-    const userId = session?.userId;
-    const userRole = session?.role;
+    const userId = session.userId;
+    const userRole = session.role;
     const isAdmin = userRole === 'ADMIN';
 
-    // Verify authorized workspace access
-    const validIds = ['tenant-default', 'tenant-legal-002', 'tenant-demo-003'];
-    if (!validIds.includes(workspaceId)) {
-      return NextResponse.json({ error: 'Unauthorized or invalid workspace requested.' }, { status: 403 });
-    }
+    // Verify user is authorized for this workspace
+    if (!isAdmin) {
+      const membership = await db.workspaceMembership.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId,
+          },
+        },
+      });
 
-    if (!isAdmin && workspaceId !== 'tenant-default') {
-      return NextResponse.json({ error: 'Access denied. You are only authorized to access assigned workspace tenant-default.' }, { status: 403 });
+      const isAllowedDemo = workspaceId === 'tenant-default';
+
+      if (!membership && !isAllowedDemo) {
+        return NextResponse.json(
+          { error: 'Access denied: You are not an authorized member of the requested workspace.' },
+          { status: 403 }
+        );
+      }
     }
 
     await auditService.recordEvent({
       tenantId: workspaceId,
-      userId: userId || undefined,
+      userId: userId,
       category: 'Administration',
       action: 'workspace.selected',
       details: `User switched active workspace context to '${workspaceId}'.`,

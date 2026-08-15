@@ -3,7 +3,33 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Megaphone, Check, Sparkles, ShieldCheck, ArrowRight, ShieldAlert, Bot, UserCheck, Zap, Calendar } from 'lucide-react';
+import {
+  ArrowLeft,
+  Megaphone,
+  Check,
+  Sparkles,
+  ShieldCheck,
+  ArrowRight,
+  ShieldAlert,
+  Bot,
+  UserCheck,
+  Zap,
+  Calendar,
+  Layers,
+  Video,
+  MessageSquare,
+  Globe,
+  Share2,
+  FileCode,
+  Lock,
+  ExternalLink,
+} from 'lucide-react';
+import {
+  CONNECTOR_CAPABILITIES,
+  connectorCapabilityRegistry,
+  ConnectorCapability,
+  PlatformId,
+} from '@/lib/connectors/connector-capability-registry';
 
 export default function NewCampaignWizardPage() {
   const router = useRouter();
@@ -305,31 +331,76 @@ export default function NewCampaignWizardPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-2">Select Target Social Channels</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { id: 'linkedin', label: 'LinkedIn', desc: 'Professional & Carousels' },
-                { id: 'facebook', label: 'Facebook', desc: 'Pages & Link Previews' },
-                { id: 'instagram', label: 'Instagram', desc: 'Visual Feed & Slides' },
-                { id: 'telegram', label: 'Telegram', desc: 'Direct Channel Posts' },
-              ].map((ch) => {
-                const isSelected = formData.channels.includes(ch.id);
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                Target Channels & Platform Connectors ({formData.channels.length} Selected)
+              </label>
+              <Link
+                href="/settings/integrations"
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                target="_blank"
+              >
+                <span>Manage API Connectors</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {connectorCapabilityRegistry.getAllCapabilities().map((connector) => {
+                const isSelected = formData.channels.includes(connector.platform);
+
+                // Derive publishing badge
+                let publishBadge = { label: 'Direct Live', color: 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300' };
+                if (connector.status === 'EXPORT_ONLY') {
+                  publishBadge = { label: 'Export Package', color: 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300' };
+                } else if (connector.status === 'API_APPROVAL_REQUIRED') {
+                  publishBadge = { label: 'Approval Required', color: 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300' };
+                } else if (connector.status === 'BETA') {
+                  publishBadge = { label: 'Beta Direct', color: 'bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300' };
+                }
+
                 return (
                   <button
-                    key={ch.id}
+                    key={connector.platform}
                     type="button"
-                    onClick={() => handleChannelToggle(ch.id)}
-                    className={`p-3 rounded-xl border text-left transition-all ${
+                    onClick={() => handleChannelToggle(connector.platform)}
+                    className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
                       isSelected
-                        ? 'bg-indigo-600/10 border-indigo-500 text-slate-900 dark:text-white font-semibold'
-                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                        ? 'bg-indigo-600/10 border-indigo-500 text-slate-900 dark:text-white font-semibold ring-1 ring-indigo-500/50 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs uppercase font-bold">{ch.label}</span>
-                      {isSelected && <Check className="w-4 h-4 text-indigo-500" />}
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs uppercase font-bold text-slate-900 dark:text-white">
+                            {connector.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono border uppercase ${publishBadge.color}`}>
+                            {publishBadge.label}
+                          </span>
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-snug line-clamp-2">
+                        {connector.description}
+                      </p>
                     </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">{ch.desc}</span>
+
+                    <div className="flex items-center gap-1.5 pt-2.5 mt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{connector.group}</span>
+                      <span>•</span>
+                      <span>{connector.carousel ? 'Carousels' : connector.videoUpload ? 'Video' : 'Text/Images'}</span>
+                    </div>
                   </button>
                 );
               })}

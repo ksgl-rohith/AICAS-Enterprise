@@ -9,12 +9,12 @@ import { signSessionPayload } from '../../src/lib/auth';
 
 describe('Mandatory Authentication Protection & Canonical Autonomy Modes', () => {
   describe('Area 2: Mandatory Route & API Authentication', () => {
-    it('should redirect unauthenticated page requests on protected workspace routes to /login with redirect param', () => {
+    it('should redirect unauthenticated page requests on protected workspace routes to /login with redirect param', async () => {
       const protectedPaths = ['/dashboard', '/campaigns', '/brands', '/approvals', '/autonomy', '/settings', '/analytics'];
 
       for (const path of protectedPaths) {
         const req = new NextRequest(`http://localhost:3000${path}`);
-        const res = middleware(req);
+        const res = await middleware(req);
 
         expect(res.status).toBe(307);
         const location = res.headers.get('location');
@@ -23,29 +23,29 @@ describe('Mandatory Authentication Protection & Canonical Autonomy Modes', () =>
       }
     });
 
-    it('should return 401 Unauthorized JSON response for unauthenticated protected API endpoints', () => {
+    it('should return 401 Unauthorized JSON response for unauthenticated protected API endpoints', async () => {
       const protectedApiPaths = ['/api/campaigns', '/api/brands', '/api/approvals', '/api/workspaces', '/api/autonomy'];
 
       for (const path of protectedApiPaths) {
         const req = new NextRequest(`http://localhost:3000${path}`);
-        const res = middleware(req);
+        const res = await middleware(req);
 
         expect(res.status).toBe(401);
       }
     });
 
-    it('should allow public access to /api/auth routes without authentication', () => {
+    it('should allow public access to /api/auth routes without authentication', async () => {
       const publicApiPaths = ['/api/auth/login', '/api/auth/signup', '/api/auth/logout', '/api/auth/me'];
 
       for (const path of publicApiPaths) {
         const req = new NextRequest(`http://localhost:3000${path}`);
-        const res = middleware(req);
+        const res = await middleware(req);
 
         expect(res.status).not.toBe(401);
       }
     });
 
-    it('should allow authenticated requests with valid session cookie to access protected routes', () => {
+    it('should allow authenticated requests with valid session cookie to access protected routes', async () => {
       const token = signSessionPayload({
         userId: 'usr_test_auth',
         email: 'auth_test@aicas.ai',
@@ -59,7 +59,7 @@ describe('Mandatory Authentication Protection & Canonical Autonomy Modes', () =>
         },
       });
 
-      const res = middleware(req);
+      const res = await middleware(req);
       expect(res.status).toBe(200);
     });
   });

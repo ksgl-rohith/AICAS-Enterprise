@@ -129,11 +129,11 @@ export function ShowcaseNav() {
               Controlled Autonomy
             </span>
             <Link
-              href="/dashboard"
+              href={user ? '/dashboard' : '/login'}
               onClick={() => setMobileMenuOpen(false)}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold"
             >
-              Enter Dashboard
+              {user ? 'Enter Dashboard' : 'Launch Application'}
             </Link>
           </div>
         </div>

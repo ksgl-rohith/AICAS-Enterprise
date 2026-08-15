@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
+import { signSessionPayload } from '@/lib/auth';
 import { GET, POST } from '@/app/api/settings/preferences/route';
 
 describe('Admin Preferences API & Security Controls', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  const adminToken = signSessionPayload({
+    userId: 'user-1',
+    email: 'admin@aicas.enterprise',
+    name: 'Administrator',
+    role: 'ADMIN',
   });
 
   it('GET /api/settings/preferences creates or fetches default user preferences', async () => {
@@ -18,10 +27,14 @@ describe('Admin Preferences API & Security Controls', () => {
       executionMode: 'mock',
     };
 
-    vi.spyOn(db.user, 'findFirst').mockResolvedValue(mockUser as any);
+    vi.spyOn(db.user, 'findUnique').mockResolvedValue(mockUser as any);
     vi.spyOn(db.userPreferences, 'findUnique').mockResolvedValue(mockPrefs as any);
 
-    const response = await GET();
+    const req = new NextRequest('http://localhost/api/settings/preferences', {
+      headers: { cookie: `aicas_session=${adminToken}` },
+    });
+
+    const response = await GET(req);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -32,11 +45,14 @@ describe('Admin Preferences API & Security Controls', () => {
   it('POST /api/settings/preferences validates allowlist provider & models', async () => {
     const mockUser = { id: 'user-1', email: 'admin@aicas.enterprise', role: 'ADMIN' };
 
-    vi.spyOn(db.user, 'findFirst').mockResolvedValue(mockUser as any);
+    vi.spyOn(db.user, 'findUnique').mockResolvedValue(mockUser as any);
 
-    const invalidReq = new Request('http://localhost/api/settings/preferences', {
+    const invalidReq = new NextRequest('http://localhost/api/settings/preferences', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `aicas_session=${adminToken}`,
+      },
       body: JSON.stringify({
         allowedAiProvider: 'unapproved_malicious_provider',
       }),
@@ -59,13 +75,16 @@ describe('Admin Preferences API & Security Controls', () => {
       executionMode: 'real',
     };
 
-    vi.spyOn(db.user, 'findFirst').mockResolvedValue(mockUser as any);
+    vi.spyOn(db.user, 'findUnique').mockResolvedValue(mockUser as any);
     vi.spyOn(db.userPreferences, 'upsert').mockResolvedValue(mockUpdatedPrefs as any);
     const auditSpy = vi.spyOn(db.auditEvent, 'create').mockResolvedValue({} as any);
 
-    const validReq = new Request('http://localhost/api/settings/preferences', {
+    const validReq = new NextRequest('http://localhost/api/settings/preferences', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `aicas_session=${adminToken}`,
+      },
       body: JSON.stringify({
         theme: 'dark',
         allowedAiProvider: 'gemini',

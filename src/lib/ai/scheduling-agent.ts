@@ -4,7 +4,7 @@ import { agentRegistry } from './agent-registry';
 
 export const ScheduledSlotSchema = z.object({
   slotId: z.string(),
-  channel: z.enum(['linkedin', 'facebook', 'instagram', 'telegram']),
+  channel: z.string(),
   proposedTime: z.string(),
   rank: z.number(),
   confidence: z.number().min(0).max(1),
@@ -18,7 +18,7 @@ export type ScheduledSlot = z.infer<typeof ScheduledSlotSchema>;
 export const SchedulingInputSchema = z.object({
   campaignId: z.string(),
   brandId: z.string(),
-  channel: z.enum(['linkedin', 'facebook', 'instagram', 'telegram']),
+  channel: z.string(),
   startDate: z.string(),
   endDate: z.string(),
   timezone: z.string().default('UTC'),
@@ -31,7 +31,7 @@ export type SchedulingInput = z.input<typeof SchedulingInputSchema>;
 
 export const SchedulingOutputSchema = z.object({
   contentItemId: z.string().optional(),
-  channel: z.enum(['linkedin', 'facebook', 'instagram', 'telegram']),
+  channel: z.string(),
   recommendedSlots: z.array(ScheduledSlotSchema),
   selectedSlot: ScheduledSlotSchema.optional(),
   isValid: z.boolean(),

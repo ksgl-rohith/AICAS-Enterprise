@@ -7,10 +7,14 @@ import { Header } from '@/components/layout/header';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isShowcase = pathname === '/';
+  const isStandalone = pathname === '/' || pathname === '/login' || pathname === '/signup';
 
-  if (isShowcase) {
-    return <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-200">{children}</div>;
+  if (isStandalone) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-200">
+        {children}
+      </div>
+    );
   }
 
   return (
@@ -18,7 +22,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950">
         <Header />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -140,7 +140,7 @@ export class CampaignLifecycleOrchestrator {
 
     const pillars = JSON.parse(campaign.strategy.contentPillarsJson || '[]');
     const ideas = JSON.parse(campaign.strategy.contentIdeasJson || '[]');
-    const channels = campaign.channels.split(',').map((c) => c.trim().toLowerCase()) as ('linkedin' | 'facebook' | 'instagram' | 'telegram')[];
+    const channels = campaign.channels.split(',').map((c) => c.trim().toLowerCase());
 
     const topicsToGenerate = ideas.length > 0 ? ideas.slice(0, 3) : [
       `Why single LLM prompts fail enterprise brand standards in ${campaign.productOrTopic}`,
@@ -275,7 +275,7 @@ export class CampaignLifecycleOrchestrator {
           });
 
           // Automatically schedule
-          const mainChannel = (channels[0] || 'linkedin') as 'linkedin' | 'facebook' | 'instagram' | 'telegram';
+          const mainChannel = channels[0] || 'linkedin';
           const schedRes = await schedulingAgent.execute({
             taskId: `task_sched_${item.id}_${Date.now()}`,
             tenantId: 'tenant-default',

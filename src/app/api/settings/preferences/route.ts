@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionFromRequest } from '@/lib/auth';
 import { z } from 'zod';
 
 const PreferencesSchema = z.object({
@@ -35,9 +36,19 @@ const PreferencesSchema = z.object({
   notifyRiskEscalation: z.boolean().default(true),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await db.user.findFirst();
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+    });
+
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -60,9 +71,19 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const user = await db.user.findFirst();
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+    });
+
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

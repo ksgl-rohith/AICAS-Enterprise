@@ -6,24 +6,25 @@ import { auditService } from '@/lib/services/audit-service';
 export async function GET(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
-    const userRole = session?.role || 'MARKETING_MANAGER';
-    const isAdmin = userRole === 'ADMIN';
+    if (!session || !session.userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Valid authentication session required' },
+        { status: 401 }
+      );
+    }
 
     const allowLivePublishing = process.env.ALLOW_LIVE_PUBLISHING === 'true';
     const envMode = process.env.PUBLISHING_MODE || 'simulated';
 
-    // Fetch user preferences for current user / tenant
-    const pref = session?.userId
-      ? await db.userPreferences.findUnique({ where: { userId: session.userId } })
-      : await db.userPreferences.findFirst();
-
+    // Fetch user preferences for current user
+    const pref = await db.userPreferences.findUnique({ where: { userId: session.userId } });
     const runtimeMode = (pref as any)?.publishingMode || (envMode === 'live' && allowLivePublishing ? 'LIVE' : 'SIMULATED');
 
     return NextResponse.json({
       success: true,
       mode: allowLivePublishing ? runtimeMode : 'SIMULATED',
       allowLivePublishing,
-      canManage: isAdmin,
+      canManage: true, // All authenticated workspace members can request toggle
       infrastructureBlocked: !allowLivePublishing,
     });
   } catch (error: any) {
@@ -34,21 +35,49 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
-    const userRole = session?.role || 'MARKETING_MANAGER';
-    const isAdmin = userRole === 'ADMIN';
-
-    if (!isAdmin) {
+    if (!session || !session.userId) {
       return NextResponse.json(
-        { error: 'Permission denied: Requires workspace.publishing.manage or ADMIN role to switch publishing mode.' },
-        { status: 403 }
+        { error: 'Unauthorized: Authentication required to switch publishing mode' },
+        { status: 401 }
       );
     }
 
-    const allowLivePublishing = process.env.ALLOW_LIVE_PUBLISHING === 'true';
+    const userId = session.userId;
+    const userRole = session.role || 'MARKETING_MANAGER';
+    const isAdmin = userRole === 'ADMIN';
+
     const body = await req.json();
     const requestedMode = body.mode === 'LIVE' ? 'LIVE' : 'SIMULATED';
+    const targetWorkspaceId = body.workspaceId || body.tenantId;
 
-    // Safety Precedence Enforcement: Infrastructure Safety Flag > Workspace Policy > User Request
+    // Cross-Workspace Isolation & Authorization Verification:
+    // If a specific workspace is targeted, ensure caller is a member or platform ADMIN.
+    if (targetWorkspaceId && !isAdmin) {
+      // Check real DB membership
+      const membership = await db.workspaceMembership.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: targetWorkspaceId,
+            userId,
+          },
+        },
+      });
+
+      // Also support legacy/demo tenant IDs if user is active
+      const isLegacyDemoTenant = ['tenant-default', 'tenant-demo-003'].includes(targetWorkspaceId);
+
+      if (!membership && !isLegacyDemoTenant) {
+        return NextResponse.json(
+          { error: 'Forbidden: You are not an authorized member of the requested workspace.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const allowLivePublishing = process.env.ALLOW_LIVE_PUBLISHING === 'true';
+
+    // Infrastructure Safety Precedence Enforcement:
+    // Infrastructure Flag (ALLOW_LIVE_PUBLISHING) > Workspace Policy > User Request
     if (requestedMode === 'LIVE' && !allowLivePublishing) {
       return NextResponse.json(
         {
@@ -60,39 +89,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = session?.userId
-      ? await db.user.findUnique({ where: { id: session.userId } })
-      : await db.user.findFirst();
+    const pref = await db.userPreferences.findUnique({ where: { userId } });
+    const previousMode = (pref as any)?.publishingMode || 'SIMULATED';
 
-    if (user) {
-      await db.userPreferences.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
-          executionMode: 'mock',
-          publishingMode: requestedMode,
-        },
-        update: {
-          publishingMode: requestedMode,
-        },
-      });
+    await db.userPreferences.upsert({
+      where: { userId },
+      create: {
+        userId,
+        executionMode: 'mock',
+        publishingMode: requestedMode,
+      },
+      update: {
+        publishingMode: requestedMode,
+      },
+    });
 
-      // Record Audit Event
-      await auditService.recordEvent({
-        category: 'Publishing',
-        severity: requestedMode === 'LIVE' ? 'warning' : 'info',
-        action: 'publishing.mode.changed',
-        details: `Workspace publishing mode switched from '${requestedMode === 'LIVE' ? 'SIMULATED' : 'LIVE'}' to '${requestedMode}'. Approved publishing actions will target ${requestedMode === 'LIVE' ? 'real connected platform APIs' : 'the simulated sandbox'}.`,
-        entityType: 'PublishingPolicy',
-        entityId: user.id,
-        userId: user.id,
-      });
-    }
+    const correlationId = `pub_mode_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Record Audit Event
+    await auditService.recordEvent({
+      tenantId: targetWorkspaceId || 'tenant-default',
+      category: 'Publishing',
+      severity: requestedMode === 'LIVE' ? 'warning' : 'info',
+      action: 'publishing.mode.changed',
+      details: `Workspace publishing mode switched from '${previousMode}' to '${requestedMode}'. Approved publishing actions will target ${requestedMode === 'LIVE' ? 'real connected platform APIs' : 'the simulated sandbox'}.`,
+      entityType: 'PublishingPolicy',
+      entityId: userId,
+      userId: userId,
+      correlationId,
+      metadata: {
+        workspaceId: targetWorkspaceId || 'tenant-default',
+        actorId: userId,
+        previousMode,
+        newMode: requestedMode,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     return NextResponse.json({
       success: true,
       mode: requestedMode,
       allowLivePublishing,
+      correlationId,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to update publishing mode' }, { status: 500 });

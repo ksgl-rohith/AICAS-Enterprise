@@ -111,15 +111,15 @@ export function AdminPreferencesModal({ isOpen, onClose }: AdminPreferencesModal
 
         {/* Body */}
         <div className="p-6 space-y-5 overflow-y-auto">
-          {/* Admin Credentials banner */}
+          {/* Admin Policy banner */}
           <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-start gap-3">
-            <Lock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
             <div className="space-y-0.5 text-xs">
               <span className="font-bold text-indigo-900 dark:text-indigo-200 block">
                 Administrator Privileges Active
               </span>
               <p className="text-slate-600 dark:text-indigo-300/80 leading-relaxed">
-                Default Credentials: <strong>Username: admin</strong> | <strong>Password: admin@123</strong>.
+                Platform execution modes and AI provider governance apply across all tenant workspaces.
               </p>
             </div>
           </div>

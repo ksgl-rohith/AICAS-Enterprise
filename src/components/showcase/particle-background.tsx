@@ -9,12 +9,20 @@ export function ParticleBackground() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    // Check for reduced motion preference
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     let animationFrameId: number;
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
+
+    const isMobile = width < 768;
 
     const handleResize = () => {
       if (!canvas) return;
@@ -22,36 +30,47 @@ export function ParticleBackground() {
       height = canvas.height = window.innerHeight;
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
 
-    // Create particles for light theme
-    const particleCount = Math.min(Math.floor(width / 25), 65);
+    // Adaptive particle count based on viewport size for lightweight rendering
+    const particleCount = isMobile
+      ? Math.min(Math.floor(width / 40), 20)
+      : Math.min(Math.floor(width / 25), 55);
+
+    const maxLineDist = isMobile ? 85 : 130;
+
     const particles = Array.from({ length: particleCount }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      radius: Math.random() * 1.8 + 0.8,
-      alpha: Math.random() * 0.4 + 0.2,
+      vx: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.35),
+      vy: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.35),
+      radius: Math.random() * 1.5 + 0.7,
+      alpha: Math.random() * 0.35 + 0.15,
       color: Math.random() > 0.4 ? '#4f46e5' : '#9333ea',
     }));
 
     const render = () => {
+      // Skip rendering if document is hidden to conserve resources
+      if (document.hidden) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+
       ctx.clearRect(0, 0, width, height);
 
-      // Render connecting lines tuned for light theme
+      // Render connecting lines
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 140) {
+          if (dist < maxLineDist) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(99, 102, 241, ${0.12 * (1 - dist / 140)})`;
-            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = `rgba(99, 102, 241, ${0.1 * (1 - dist / maxLineDist)})`;
+            ctx.lineWidth = 0.75;
             ctx.stroke();
           }
         }

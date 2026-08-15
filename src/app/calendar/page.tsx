@@ -280,7 +280,7 @@ export default function CalendarPage() {
       {/* Schedule Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl">
+          <div className="max-w-md w-full p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Schedule Approved Post</h3>
 
             <form onSubmit={handleCreateSchedule} className="space-y-4 text-xs">

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSessionFromRequest } from '@/lib/auth';
 import { auditService } from '@/lib/services/audit-service';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const pref = await db.userPreferences.findFirst();
-    const mode = pref?.executionMode || 'mock';
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
+
+    let mode = 'mock';
+    if (userId) {
+      const pref = await db.userPreferences.findUnique({ where: { userId } });
+      if (pref?.executionMode) mode = pref.executionMode;
+    }
 
     const hasGeminiKey = Boolean((process.env.GEMINI_API_KEY || '').trim());
     const hasOpenAIKey = Boolean((process.env.OPENAI_API_KEY || '').trim());
@@ -24,6 +31,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
     const body = await req.json();
     const requestedMode = body.mode === 'real' ? 'real' : 'mock';
 
@@ -42,12 +51,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await db.user.findFirst();
-    if (user) {
+    if (userId) {
       await db.userPreferences.upsert({
-        where: { userId: user.id },
+        where: { userId },
         create: {
-          userId: user.id,
+          userId,
           executionMode: requestedMode,
         },
         update: {
@@ -61,8 +69,8 @@ export async function POST(req: NextRequest) {
         action: 'engine.mode.changed',
         details: `System AI Engine execution mode switched to '${requestedMode.toUpperCase()}'.`,
         entityType: 'UserPreferences',
-        entityId: user.id,
-        userId: user.id,
+        entityId: userId,
+        userId: userId,
       });
     }
 

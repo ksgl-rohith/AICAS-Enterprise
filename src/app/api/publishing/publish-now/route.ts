@@ -1,8 +1,9 @@
 import { db } from '@/lib/db';
 import { publishingRouter } from '@/lib/connectors/publishing-router';
-import { NextResponse } from 'next/server';
+import { getSessionFromRequest } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { contentItemId, channel, scheduleId } = body;
@@ -105,10 +106,12 @@ export async function POST(req: Request) {
     }
 
     // Log Audit Event
-    const user = await db.user.findFirst();
+    const session = getSessionFromRequest(req);
+    const userId = session?.userId;
+
     await db.auditEvent.create({
       data: {
-        userId: user?.id,
+        userId: userId || undefined,
         brandId: contentItem.campaign.brandId,
         campaignId: contentItem.campaignId,
         action: publishResult.isSimulated ? 'PUBLISHED_SIMULATED' : 'PUBLISHED_LIVE',

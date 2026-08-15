@@ -237,7 +237,7 @@ export class OrchestratorAgent {
     });
 
     // Step F: Generation & Quality Council Review Loop
-    const channels = campaign.channels.split(',') as ('linkedin' | 'facebook' | 'instagram' | 'telegram')[];
+    const channels = campaign.channels.split(',').map((c) => c.trim().toLowerCase());
     const contentIdeas = stratResult.output?.contentIdeas || [campaign.productOrTopic];
     const planItems = planResult.output?.planItems || [];
 

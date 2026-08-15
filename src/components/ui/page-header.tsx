@@ -70,7 +70,7 @@ export function PageHeader({
         </div>
 
         {/* Action Controls */}
-        {actions && <div className="flex items-center gap-2.5 shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0 self-start sm:self-auto">{actions}</div>}
       </div>
 
       {children}

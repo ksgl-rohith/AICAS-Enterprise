@@ -301,12 +301,25 @@ Prohibited Themes: ${task.input.prohibitedThemes || 'None'}${hasFeedback ? `\nRe
           evidenceIds: ['doc_case_study_03'],
         },
       ],
-      channelRoles: {
-        linkedin: `Executive thought leadership, structured industry frameworks, and client impact highlights for ${task.input.targetAudience}`,
-        facebook: `Community resource guides, informational event cards, and customer stories for ${task.input.productOrTopic}`,
-        instagram: `High-contrast infographic slides, visual checklist guides, and direct link CTA promotions`,
-        telegram: `Instant subscriber alerts, key industry updates, and direct event announcements`,
-      },
+      channelRoles: task.input.channels.reduce((acc, ch) => {
+        const platformMap: Record<string, string> = {
+          linkedin: `Executive thought leadership, structured industry frameworks, and client impact highlights for ${task.input.targetAudience}`,
+          facebook: `Community resource guides, informational event cards, and customer stories for ${task.input.productOrTopic}`,
+          instagram: `High-contrast infographic slides, visual checklist guides, and direct link CTA promotions`,
+          x: `Concise executive threads, breaking market shifts, and rapid customer engagement for ${industry}`,
+          threads: `Conversational community discussions, behind-the-scenes perspectives, and quick polls`,
+          youtube: `Comprehensive video explainers, architectural deep dives, and client case study highlights`,
+          tiktok: `Dynamic short-form video insights, visual tips, and quick executive breakdowns`,
+          pinterest: `Visual blueprints, infographic pins, and strategic process roadmaps for ${brandName}`,
+          reddit: `In-depth technical discussions, AMA sessions, and community feedback exploration in relevant subreddits`,
+          quora: `Authoritative answers to high-intent industry questions regarding ${task.input.productOrTopic}`,
+          wordpress: `Long-form blog articles, white papers, and thought leadership releases`,
+          website: `Direct corporate CMS publications, product release notes, and newsroom updates`,
+          telegram: `Instant subscriber alerts, key industry updates, and direct event announcements`,
+        };
+        acc[ch] = platformMap[ch] || `Targeted messaging and engagement for ${ch} targeting ${task.input.targetAudience}`;
+        return acc;
+      }, {} as Record<string, string>),
       publishingCadence: `Strategic multi-channel cadence optimized for peak ${industry} audience engagement hours.`,
       contentIdeas: [
         `Why ${task.input.targetAudience} Choose ${brandName} for ${task.input.productOrTopic}`,
