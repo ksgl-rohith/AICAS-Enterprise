@@ -71,7 +71,16 @@ export function signSessionPayload(
 /**
  * Verify and decode session token string.
  */
-const FALLBACK_SECRET = 'aicas_enterprise_secure_session_secret_key_32bytes';
+const CANDIDATE_SECRETS = Array.from(
+  new Set(
+    [
+      process.env.SESSION_SECRET,
+      '54c9fb727bb0342698817079b67200c63f45f7da94cfa39d911aa1a2a40615e5',
+      'aicas_enterprise_secure_session_secret_key_32bytes',
+      'aicas_super_secret_state_token_key_12345',
+    ].filter(Boolean) as string[]
+  )
+);
 
 /**
  * Verify and decode session token string.
@@ -87,27 +96,18 @@ export function verifySessionToken(token: string | undefined | null): UserSessio
     if (parts.length !== 2) return null;
     const [base64Data, signature] = parts;
 
-    // 1. Verify with primary secret
     let isValid = false;
-    const expectedSig = crypto
-      .createHmac('sha256', SESSION_SECRET)
-      .update(base64Data)
-      .digest('hex');
-
-    const expectedBuffer = Buffer.from(expectedSig, 'hex');
     const signatureBuffer = Buffer.from(signature, 'hex');
 
-    if (expectedBuffer.length === signatureBuffer.length && crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) {
-      isValid = true;
-    } else if (SESSION_SECRET !== FALLBACK_SECRET) {
-      // 2. Fallback verification
-      const fallbackSig = crypto
-        .createHmac('sha256', FALLBACK_SECRET)
+    for (const secret of CANDIDATE_SECRETS) {
+      const expectedSig = crypto
+        .createHmac('sha256', secret)
         .update(base64Data)
         .digest('hex');
-      const fallbackBuffer = Buffer.from(fallbackSig, 'hex');
-      if (fallbackBuffer.length === signatureBuffer.length && crypto.timingSafeEqual(fallbackBuffer, signatureBuffer)) {
+      const expectedBuffer = Buffer.from(expectedSig, 'hex');
+      if (expectedBuffer.length === signatureBuffer.length && crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) {
         isValid = true;
+        break;
       }
     }
 

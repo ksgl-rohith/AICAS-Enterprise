@@ -37,7 +37,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true);
-      const res = await fetch('/api/workspaces');
+      const res = await fetch('/api/workspaces', { cache: 'no-store' });
       const data = await res.json();
       if (res.ok && data.success && Array.isArray(data.workspaces)) {
         setWorkspaces(data.workspaces);

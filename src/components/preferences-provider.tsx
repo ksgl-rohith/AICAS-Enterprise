@@ -108,7 +108,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   const fetchServerPreferences = async () => {
     try {
-      const res = await fetch('/api/settings/preferences');
+      const res = await fetch('/api/settings/preferences', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data && !data.error) {

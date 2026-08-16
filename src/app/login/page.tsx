@@ -42,13 +42,14 @@ function LoginFormContent() {
     try {
       const res = await login(email.trim(), password.trim(), rememberMe);
       if (res.success) {
-        router.push(redirectPath);
+        // Immediate clean navigation to force fresh cookies & providers across all pages
+        window.location.href = redirectPath;
       } else {
         setErrorMsg(res.error || 'Invalid email or password.');
+        setSubmitting(false);
       }
     } catch {
       setErrorMsg('Unable to sign in right now. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -91,13 +92,13 @@ function LoginFormContent() {
         }
       );
       if (res.success) {
-        router.push(redirectPath);
+        window.location.href = redirectPath;
       } else {
         setErrorMsg(res.error || 'Account registration failed.');
+        setSubmitting(false);
       }
     } catch {
       setErrorMsg('Registration request failed. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };

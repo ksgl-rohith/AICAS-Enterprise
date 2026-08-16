@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromRequest, clearSessionCookie } from '@/lib/auth';
+import { getSessionFromRequest } from '@/lib/auth';
 import { db } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    const res = NextResponse.json({ authenticated: false, user: null }, { status: 401 });
-    clearSessionCookie(res);
-    return res;
+    return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
   }
 
   try {
@@ -16,9 +16,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!user || (user.status && user.status !== 'ACTIVE')) {
-      const res = NextResponse.json({ authenticated: false, user: null }, { status: 401 });
-      clearSessionCookie(res);
-      return res;
+      return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
     }
 
     return NextResponse.json({
