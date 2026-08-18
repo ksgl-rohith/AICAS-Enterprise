@@ -50,38 +50,19 @@ export async function GET(req: NextRequest) {
         role: 'ADMIN',
       }));
 
-      // Also include demo fixtures for admin testing
-      const demoFixtures = [
-        {
-          id: 'tenant-default',
-          name: 'ApexAI Enterprise (Demo Testbed)',
-          code: 'DEMO-APEX',
-          description: 'Isolated test environment for multi-agent experimentation and simulated publishing.',
-          role: 'ADMIN',
-        },
-        {
-          id: 'tenant-legal-002',
-          name: 'Kandvate Legal Advisory (Demo)',
-          code: 'DEMO-LAW',
-          description: 'Legal & compliance advisory workspace for corporate dispute resolution.',
-          role: 'ADMIN',
-        },
-      ];
-
-      authorizedWorkspaces = [...authorizedWorkspaces, ...additionalAdminWorkspaces, ...demoFixtures];
+      authorizedWorkspaces = [...authorizedWorkspaces, ...additionalAdminWorkspaces];
     }
 
-    // 3. Fallback for legacy seeded user if no DB workspace was created yet
+    // 3. Fallback: Auto-create personal workspace for user if none exists
     if (authorizedWorkspaces.length === 0) {
-      // Auto-create personal workspace for existing user
       const userFirstName = dbUser.name.split(' ')[0] || 'My';
       const defaultWsName = `${userFirstName}'s Organization`;
-      const defaultCode = `${userFirstName.toUpperCase().slice(0, 6)}-WS`;
+      const defaultCode = `${userFirstName.toUpperCase().slice(0, 6)}-WS-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       const newWs = await db.workspace.create({
         data: {
           name: defaultWsName,
-          code: `${defaultCode}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          code: defaultCode,
           description: `Personal enterprise workspace for ${dbUser.name}.`,
         },
       });
@@ -130,8 +111,17 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.userId;
-    const userRole = session.role;
-    const isAdmin = userRole === 'ADMIN';
+    const dbUser = await db.user.findUnique({ where: { id: userId } });
+    if (!dbUser || (dbUser.status && dbUser.status !== 'ACTIVE')) {
+      return NextResponse.json({ error: 'Unauthorized: User not found or inactive' }, { status: 401 });
+    }
+
+    const isAdmin = dbUser.role === 'ADMIN' || session.role === 'ADMIN';
+
+    // Verify target workspace exists
+    const targetWs = await db.workspace.findUnique({
+      where: { id: workspaceId },
+    });
 
     // Verify user is authorized for this workspace
     if (!isAdmin) {
@@ -144,14 +134,17 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const isAllowedDemo = workspaceId === 'tenant-default';
-
-      if (!membership && !isAllowedDemo) {
+      if (!membership) {
         return NextResponse.json(
           { error: 'Access denied: You are not an authorized member of the requested workspace.' },
           { status: 403 }
         );
       }
+    } else if (!targetWs) {
+      return NextResponse.json(
+        { error: `Workspace "${workspaceId}" not found.` },
+        { status: 404 }
+      );
     }
 
     await auditService.recordEvent({
@@ -172,3 +165,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to switch active workspace' }, { status: 500 });
   }
 }
+

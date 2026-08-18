@@ -21,9 +21,11 @@ import {
   BrandDocumentUploader,
   UploadedFileItem,
 } from '@/components/ui/brand-document-uploader';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function NewBrandPage() {
   const router = useRouter();
+  const { activeWorkspace } = useWorkspace();
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -122,11 +124,15 @@ export default function NewBrandPage() {
       const brandRes = await fetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          workspaceId: activeWorkspace?.id,
+        }),
       });
 
       if (!brandRes.ok) {
-        throw new Error('Failed to create brand record.');
+        const errData = await brandRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to create brand record.');
       }
 
       const brand = await brandRes.json();
@@ -153,8 +159,15 @@ export default function NewBrandPage() {
       }
 
       setSubmissionProgress('Brand DNA Profile created successfully!');
+      
+      // Dispatch workspace notification so dashboard and brand selectors update immediately
+      if (typeof window !== 'undefined' && activeWorkspace?.id) {
+        window.dispatchEvent(new CustomEvent('workspace-changed', { detail: { workspaceId: activeWorkspace.id } }));
+      }
+
       setTimeout(() => {
         router.push(`/brands/${brand.id}`);
+        router.refresh();
       }, 800);
     } catch (err: any) {
       alert(err.message || 'Error creating Brand Profile.');

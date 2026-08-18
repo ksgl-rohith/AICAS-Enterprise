@@ -251,22 +251,22 @@ export default function CampaignStrategyPreviewPage({ params }: { params: { id: 
       ) : (
         <div className="space-y-6">
           {/* Executive Overview & Narrative */}
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-900/30 via-indigo-900/30 to-slate-900 border border-purple-500/30 space-y-4 shadow-xl text-white">
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-indigo-50/80 via-purple-50/60 to-white dark:from-purple-950/30 dark:via-indigo-950/30 dark:to-slate-900 border border-indigo-100 dark:border-purple-500/30 space-y-4 shadow-lg text-slate-900 dark:text-white transition-all">
             <div>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-purple-400 block mb-1">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-600 dark:text-purple-400 block mb-1">
                 Campaign Master Narrative
               </span>
-              <h2 className="text-lg md:text-xl font-black leading-snug">{strategy.campaignNarrative}</h2>
+              <h2 className="text-lg md:text-xl font-black leading-snug text-slate-900 dark:text-white">{strategy.campaignNarrative}</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Objective Interpretation</span>
-                <p className="text-slate-200">{strategy.objectiveInterpretation}</p>
+              <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-950/80 border border-indigo-100/80 dark:border-slate-800 space-y-1 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase block">Objective Interpretation</span>
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{strategy.objectiveInterpretation}</p>
               </div>
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Target Audience Summary</span>
-                <p className="text-slate-200">{strategy.audienceSummary}</p>
+              <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-950/80 border border-indigo-100/80 dark:border-slate-800 space-y-1 shadow-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase block">Target Audience Summary</span>
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{strategy.audienceSummary}</p>
               </div>
             </div>
           </div>

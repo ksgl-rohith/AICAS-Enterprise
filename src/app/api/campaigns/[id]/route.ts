@@ -1,8 +1,11 @@
 import { db } from '@/lib/db';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
+
     const campaign = await db.campaign.findUnique({
       where: { id: params.id },
       include: {
@@ -31,14 +34,43 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
     return NextResponse.json(campaign);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
+
+    const campaign = await db.campaign.findUnique({
+      where: { id: params.id },
+      include: { brand: true },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+    }
+
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to update campaign in another workspace', 403);
+    }
+
     const body = await req.json();
 
     // 1. Handle Content Variant Human Rewrite
@@ -89,15 +121,36 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json(updated);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
+
+    const campaign = await db.campaign.findUnique({
+      where: { id: params.id },
+      include: { brand: true },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+    }
+
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to delete campaign in another workspace', 403);
+    }
+
     await db.campaign.delete({ where: { id: params.id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
+

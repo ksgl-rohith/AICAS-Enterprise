@@ -1,9 +1,12 @@
 import { db } from '@/lib/db';
 import { strategyAgent } from '@/lib/ai/strategy-agent';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
+
     const campaign = await db.campaign.findUnique({
       where: { id: params.id },
       include: { brand: true },
@@ -13,12 +16,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
     const taskId = `task_strat_${campaign.id}_${Date.now()}`;
     const channels = campaign.channels.split(',').map((c) => c.trim().toLowerCase());
 
     const result = await strategyAgent.execute({
       taskId,
-      tenantId: 'tenant-default',
+      tenantId: campaign.brand.workspaceId || authResult.workspaceId,
       brandId: campaign.brandId,
       campaignId: campaign.id,
       input: {
@@ -93,6 +105,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Log Audit Event
     await db.auditEvent.create({
       data: {
+        tenantId: campaign.brand.workspaceId || authResult.workspaceId,
         userId: campaign.brand.userId,
         brandId: campaign.brandId,
         campaignId: campaign.id,
@@ -109,6 +122,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       result,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }

@@ -1,26 +1,52 @@
 import { db } from '@/lib/db';
-import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId');
-    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId');
+    const requestedWs = searchParams.get('workspaceId') || searchParams.get('tenantId');
 
-    let whereClause: any = {};
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
+
+    let whereClause: any = {
+      brand: {
+        OR: [
+          { workspaceId: authResult.workspaceId },
+          { userId: authResult.userId, workspaceId: null },
+        ],
+      },
+    };
+
     if (brandId) {
-      whereClause.brandId = brandId;
-    } else if (workspaceId) {
-      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
-      whereClause.brandId = { in: allowedBrandIds };
+      // If brandId specified, ensure it belongs to authorized workspace
+      const targetBrand = await db.brand.findUnique({
+        where: { id: brandId },
+        select: { id: true, workspaceId: true, userId: true },
+      });
+
+      if (!targetBrand) {
+        return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+      }
+
+      const isBrandAuthorized =
+        authResult.isAdmin ||
+        targetBrand.workspaceId === authResult.workspaceId ||
+        targetBrand.userId === authResult.userId;
+
+      if (!isBrandAuthorized) {
+        throw new WorkspaceAuthError('Forbidden: Access denied to campaigns for brand in another workspace', 403);
+      }
+
+      whereClause = { brandId };
     }
 
     const campaigns = await db.campaign.findMany({
       where: whereClause,
       include: {
         brand: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, workspaceId: true },
         },
         strategy: true,
         contentItems: {
@@ -40,20 +66,40 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(campaigns);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const requestedWs = body.workspaceId || body.tenantId;
+
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
+
+    if (!body.brandId) {
+      return NextResponse.json({ error: 'brandId is required' }, { status: 400 });
+    }
 
     const brand = await db.brand.findUnique({
       where: { id: body.brandId },
     });
 
     if (!brand) {
-      return NextResponse.json({ error: 'Selected Brand not found' }, { status: 400 });
+      return NextResponse.json({ error: 'Selected Brand not found' }, { status: 404 });
+    }
+
+    // Verify brand belongs to authorized workspace
+    const isBrandAuthorized =
+      authResult.isAdmin ||
+      brand.workspaceId === authResult.workspaceId ||
+      brand.userId === authResult.userId;
+
+    if (!isBrandAuthorized) {
+      throw new WorkspaceAuthError(
+        'Forbidden: Access denied to create campaign for brand in another workspace',
+        403
+      );
     }
 
     const campaign = await db.campaign.create({
@@ -84,7 +130,8 @@ export async function POST(req: NextRequest) {
 
     await db.auditEvent.create({
       data: {
-        userId: brand.userId,
+        tenantId: brand.workspaceId || authResult.workspaceId,
+        userId: authResult.userId,
         brandId: brand.id,
         campaignId: campaign.id,
         action: 'CAMPAIGN_CREATED',
@@ -96,6 +143,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(campaign, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
+

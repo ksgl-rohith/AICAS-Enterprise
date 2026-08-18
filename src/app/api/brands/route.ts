@@ -1,23 +1,24 @@
 import { brandDeduplicationService } from '@/lib/brand/brand-deduplication-service';
 import { DomainNormalizer } from '@/lib/brand/domain-normalizer';
 import { db } from '@/lib/db';
-import { getBrandsForWorkspace } from '@/lib/workspace-filter';
-import { getSessionFromRequest } from '@/lib/auth';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId');
+    const requestedWs = searchParams.get('workspaceId') || searchParams.get('tenantId');
 
-    let whereClause: any = undefined;
-    if (workspaceId) {
-      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
-      whereClause = { id: { in: allowedBrandIds } };
-    }
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
 
     const brands = await db.brand.findMany({
-      where: whereClause,
+      where: {
+        OR: [
+          { workspaceId: authResult.workspaceId },
+          { userId: authResult.userId, workspaceId: null },
+        ],
+        isArchived: false,
+      },
       include: {
         _count: {
           select: {
@@ -31,31 +32,22 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(brands);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSessionFromRequest(req);
-    const userId = session?.userId;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required to create brand profile' }, { status: 401 });
-    }
-
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 });
-    }
-
     const body = await req.json();
+    const requestedWs = body.workspaceId || body.tenantId;
+
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
 
     const websiteUrl = body.websiteUrl || body.originalWebsiteUrl || null;
     const normalized = DomainNormalizer.normalize(websiteUrl);
 
-    // 1. Run Duplicate Detection
-    const dupCheck = await brandDeduplicationService.detectDuplicate('tenant-default', body.name, websiteUrl);
+    // 1. Run Duplicate Detection (scoped to authorized workspace)
+    const dupCheck = await brandDeduplicationService.detectDuplicate(authResult.workspaceId, body.name, websiteUrl);
     if (dupCheck.matchType === 'EXACT_DUPLICATE') {
       return NextResponse.json(
         {
@@ -71,8 +63,8 @@ export async function POST(req: NextRequest) {
 
     const brand = await db.brand.create({
       data: {
-        userId: user.id,
-        workspaceId: body.workspaceId || body.tenantId || null,
+        userId: authResult.userId,
+        workspaceId: authResult.workspaceId,
         name: body.name,
         industry: body.industry || 'Technology',
         description: body.description || '',
@@ -96,10 +88,11 @@ export async function POST(req: NextRequest) {
 
     await db.auditEvent.create({
       data: {
-        userId: user.id,
+        tenantId: authResult.workspaceId,
+        userId: authResult.userId,
         brandId: brand.id,
         action: 'BRAND_CREATED',
-        details: `Brand "${brand.name}" created (${normalized?.normalizedDomain || 'no domain'}).`,
+        details: `Brand "${brand.name}" created in workspace "${authResult.workspace.name}" (${normalized?.normalizedDomain || 'no domain'}).`,
         entityType: 'Brand',
         entityId: brand.id,
       },
@@ -113,6 +106,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
+

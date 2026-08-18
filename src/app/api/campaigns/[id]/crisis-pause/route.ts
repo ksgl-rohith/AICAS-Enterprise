@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crisisPauseService } from '@/lib/publishing/crisis-pause-service';
 import { db } from '@/lib/db';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
     const campaignId = params.id;
     const body = await req.json();
     const { action, reason, initiatedBy } = body;
@@ -20,27 +22,39 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
+    const tenantId = campaign.brand.workspaceId || authResult.workspaceId;
+
     if (action === 'pause') {
       const log = await crisisPauseService.pauseBrand(
-        'tenant-default',
+        tenantId,
         campaign.brandId,
         reason || 'Emergency crisis pause initiated',
-        initiatedBy || 'operator'
+        initiatedBy || authResult.user.name || 'operator'
       );
       return NextResponse.json({ success: true, action: 'PAUSED', log });
     }
 
     if (action === 'resume') {
       const log = await crisisPauseService.resumeBrand(
-        'tenant-default',
+        tenantId,
         campaign.brandId,
-        initiatedBy || 'operator'
+        initiatedBy || authResult.user.name || 'operator'
       );
       return NextResponse.json({ success: true, action: 'RESUMED', log });
     }
 
     return NextResponse.json({ error: 'Invalid crisis pause action' }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return handleWorkspaceAuthError(err);
   }
 }
+

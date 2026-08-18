@@ -1,26 +1,52 @@
 import { db } from '@/lib/db';
 import { apiCredentialsService } from '@/lib/connectors/api-credentials-service';
-import { getBrandsForWorkspace } from '@/lib/workspace-filter';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get('workspaceId') || searchParams.get('tenantId') || 'tenant-default';
+    const requestedWs = searchParams.get('workspaceId') || searchParams.get('tenantId');
     const brandIdParam = searchParams.get('brandId');
 
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
+
     let brandId = brandIdParam;
-    if (!brandId) {
-      const allowedBrandIds = await getBrandsForWorkspace(workspaceId);
-      const firstBrand = await db.brand.findFirst({
-        where: { id: { in: allowedBrandIds } },
+    if (brandId) {
+      const brand = await db.brand.findUnique({
+        where: { id: brandId },
+        select: { id: true, workspaceId: true, userId: true },
       });
-      brandId = firstBrand?.id || allowedBrandIds[0] || '';
+
+      if (!brand) {
+        return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+      }
+
+      const isAuthorized =
+        authResult.isAdmin ||
+        brand.workspaceId === authResult.workspaceId ||
+        brand.userId === authResult.userId;
+
+      if (!isAuthorized) {
+        throw new WorkspaceAuthError('Forbidden: Access denied to integrations for brand in another workspace', 403);
+      }
+    } else {
+      const firstBrand = await db.brand.findFirst({
+        where: {
+          OR: [
+            { workspaceId: authResult.workspaceId },
+            { userId: authResult.userId, workspaceId: null },
+          ],
+          isArchived: false,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      brandId = firstBrand?.id || '';
     }
 
     const [connections, dbCredentials] = await Promise.all([
       brandId ? db.platformConnection.findMany({ where: { brandId } }) : [],
-      apiCredentialsService.getCredentials(workspaceId),
+      apiCredentialsService.getCredentials(authResult.workspaceId),
     ]);
 
     const hasCred = (provider: string) => dbCredentials.some((c) => c.provider === provider && (c.status === 'configured' || c.status === 'connected'));
@@ -38,13 +64,14 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({
-      workspaceId,
+      workspaceId: authResult.workspaceId,
       brandId,
       connections,
       dbCredentials,
       systemConfig,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
+

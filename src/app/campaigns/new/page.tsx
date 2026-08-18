@@ -27,12 +27,13 @@ import {
 import {
   CONNECTOR_CAPABILITIES,
   connectorCapabilityRegistry,
-  ConnectorCapability,
   PlatformId,
 } from '@/lib/connectors/connector-capability-registry';
+import { useWorkspace } from '@/components/workspace-context';
 
 export default function NewCampaignWizardPage() {
   const router = useRouter();
+  const { activeWorkspace } = useWorkspace();
   const [step, setStep] = useState(1);
   const [brands, setBrands] = useState<any[]>([]);
 
@@ -68,19 +69,44 @@ export default function NewCampaignWizardPage() {
     pillars: string[];
   } | null>(null);
 
-  useEffect(() => {
-    fetch('/api/brands')
+  const fetchBrands = (wsId?: string) => {
+    const targetWs = wsId || activeWorkspace?.id || 'tenant-default';
+    fetch(`/api/brands?workspaceId=${targetWs}`)
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setBrands(data);
-          setFormData((prev) => ({ ...prev, brandId: data[0].id }));
+          if (data.length > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              brandId: prev.brandId && data.some((b) => b.id === prev.brandId) ? prev.brandId : data[0].id,
+            }));
+          } else {
+            setFormData((prev) => ({ ...prev, brandId: '' }));
+          }
         }
-      });
-  }, []);
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
-    if (!formData.brandId) return;
+    fetchBrands(activeWorkspace?.id);
+
+    const handleWorkspaceChanged = (e: any) => {
+      fetchBrands(e.detail?.workspaceId);
+    };
+
+    window.addEventListener('workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('workspace-changed', handleWorkspaceChanged);
+    };
+  }, [activeWorkspace?.id]);
+
+  useEffect(() => {
+    if (!formData.brandId) {
+      setSuggestions(null);
+      return;
+    }
     fetch(`/api/brands/${formData.brandId}/suggestions`)
       .then((res) => res.json())
       .then((data) => {
@@ -115,12 +141,19 @@ export default function NewCampaignWizardPage() {
   };
 
   const handleSubmit = async () => {
+    if (!formData.brandId) {
+      alert('Please select or create a Brand Profile first.');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          workspaceId: activeWorkspace?.id,
+        }),
       });
 
       const data = await res.json();
@@ -128,6 +161,7 @@ export default function NewCampaignWizardPage() {
         // Automatically trigger Strategy Agent generation
         await fetch(`/api/campaigns/${data.id}/generate-strategy`, { method: 'POST' });
         router.push(`/campaigns/${data.id}/strategy-preview`);
+        router.refresh();
       } else {
         alert(data.error || 'Failed to create campaign');
         setSubmitting(false);
@@ -174,18 +208,32 @@ export default function NewCampaignWizardPage() {
           </h2>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Target Brand Profile *</label>
-            <select
-              value={formData.brandId}
-              onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-            >
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.industry})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Brand Profile *</label>
+              <Link href="/brands/new" className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                + Ingest Brand
+              </Link>
+            </div>
+            {brands.length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3">
+                <span>No brands found in {activeWorkspace?.name || 'this workspace'}. Please create a Brand DNA profile first.</span>
+                <Link href="/brands/new" className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold text-[11px] shrink-0 transition-colors">
+                  Create Brand
+                </Link>
+              </div>
+            ) : (
+              <select
+                value={formData.brandId}
+                onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              >
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.industry})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

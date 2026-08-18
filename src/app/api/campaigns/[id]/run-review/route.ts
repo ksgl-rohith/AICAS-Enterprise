@@ -1,12 +1,16 @@
 import { db } from '@/lib/db';
 import { reviewAgent } from '@/lib/ai/review-agent';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
+
     const campaign = await db.campaign.findUnique({
       where: { id: params.id },
       include: {
+        brand: true,
         contentItems: true,
       },
     });
@@ -15,13 +19,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
+    const tenantId = campaign.brand.workspaceId || authResult.workspaceId;
     const reviewResults = [];
 
     for (const item of campaign.contentItems) {
       const taskId = `task_rev_${item.id}_${Date.now()}`;
       const res = await reviewAgent.execute({
         taskId,
-        tenantId: 'tenant-default',
+        tenantId,
         brandId: campaign.brandId,
         campaignId: campaign.id,
         input: {
@@ -71,6 +85,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       reviews: reviewResults,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }

@@ -1,9 +1,11 @@
 import { db } from '@/lib/db';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextResponse } from 'next/server';
 import pdfParse from 'pdf-parse';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const textContent = formData.get('textContent') as string | null;
@@ -15,6 +17,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (!brand) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    }
+
+    const isAuthorized =
+      authResult.isAdmin ||
+      brand.workspaceId === authResult.workspaceId ||
+      brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to brand in another workspace', 403);
     }
 
     if (brand.knowledgeDocs.length >= 5) {
@@ -118,6 +129,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       chunkCount: chunks.length,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }

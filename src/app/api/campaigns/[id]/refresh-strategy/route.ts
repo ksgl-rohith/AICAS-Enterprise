@@ -1,13 +1,13 @@
 import { db } from '@/lib/db';
 import { strategyAgent } from '@/lib/ai/strategy-agent';
 import { auditService } from '@/lib/services/audit-service';
-import { getSessionFromRequest } from '@/lib/auth';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = getSessionFromRequest(req);
-    const userId = session?.userId || 'SYSTEM';
+    const authResult = await resolveAuthorizedWorkspace(req);
+    const userId = authResult.userId;
 
     const body = await req.json().catch(() => ({}));
     const { feedback, feedbackCategories, selectiveRefresh } = body;
@@ -21,6 +21,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
+    const tenantId = campaign.brand.workspaceId || authResult.workspaceId;
     const currentVersion = campaign.strategy ? campaign.strategy.version + 1 : 1;
     const taskId = `task_strat_refresh_${campaign.id}_${Date.now()}`;
     const channels = campaign.channels.split(',').map((c) => c.trim().toLowerCase());
@@ -28,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Record audit: strategy.feedback.submitted
     if (feedback && feedback.trim().length > 0) {
       await auditService.recordEvent({
-        tenantId: 'tenant-default',
+        tenantId,
         brandId: campaign.brandId,
         campaignId: campaign.id,
         category: 'Campaign',
@@ -47,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Record audit: strategy.intelligence.refresh.requested
     await auditService.recordEvent({
-      tenantId: 'tenant-default',
+      tenantId,
       brandId: campaign.brandId,
       campaignId: campaign.id,
       category: 'Campaign',
@@ -65,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Execute Strategy Agent with latest social metrics, trends, and feedback
     const result = await strategyAgent.execute({
       taskId,
-      tenantId: 'tenant-default',
+      tenantId,
       brandId: campaign.brandId,
       campaignId: campaign.id,
       input: {
@@ -174,7 +184,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Record audit: strategy.revision.generated
     await auditService.recordEvent({
-      tenantId: 'tenant-default',
+      tenantId,
       brandId: campaign.brandId,
       campaignId: campaign.id,
       category: 'Campaign',
@@ -198,6 +208,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       result,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Strategy refresh failed' }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }

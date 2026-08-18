@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { reviewAgent } from '@/lib/ai/review-agent';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(request);
     const campaignId = params.id;
     const campaign = await db.campaign.findUnique({
       where: { id: campaignId },
@@ -25,12 +27,22 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Campaign not found' }, { status: 404 });
     }
 
+    const isAuthorized =
+      authResult.isAdmin ||
+      campaign.brand.workspaceId === authResult.workspaceId ||
+      campaign.brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to campaign in another workspace', 403);
+    }
+
+    const tenantId = campaign.brand.workspaceId || authResult.workspaceId;
     const reviews = [];
 
     for (const item of campaign.contentItems) {
       const res = await reviewAgent.execute({
         taskId: `task_audit_${item.id}`,
-        tenantId: 'tenant-default',
+        tenantId,
         brandId: campaign.brandId,
         campaignId,
         input: {
@@ -56,9 +68,7 @@ export async function GET(
       reviews,
     });
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch Quality Council audit' },
-      { status: 500 }
-    );
+    return handleWorkspaceAuthError(error);
   }
 }
+

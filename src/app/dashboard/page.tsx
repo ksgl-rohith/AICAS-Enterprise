@@ -39,11 +39,14 @@ export default function DashboardPage() {
       .then(([brandsData, campaignsData, approvalsData, analyticsData]) => {
         setBrandsCount(Array.isArray(brandsData) ? brandsData.length : 0);
         setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
-        setApprovalsCount(
-          Array.isArray(approvalsData)
+        const pendingCount = typeof approvalsData?.counts?.pending === 'number'
+          ? approvalsData.counts.pending
+          : Array.isArray(approvalsData)
             ? approvalsData.filter((i: any) => i.status === 'IN_REVIEW' || i.status === 'NEEDS_REVISION').length
-            : 0
-        );
+            : Array.isArray(approvalsData?.queue)
+              ? approvalsData.queue.filter((i: any) => i.status === 'IN_REVIEW' || i.status === 'NEEDS_REVISION').length
+              : 0;
+        setApprovalsCount(pendingCount);
         setAnalytics(analyticsData?.summary || null);
         setLoading(false);
       })

@@ -87,21 +87,6 @@ export default function CampaignWorkspacePage({ params }: { params: { id: string
     { key: 'scheduled', label: 'Scheduling & Calendar', status: schedules.length > 0 ? 'completed' as const : 'pending' as const },
   ];
 
-  const mockForecast = {
-    predictedMetrics: {
-      impressions: { estimate: 14500, lowerBound: 11200, upperBound: 18900, confidence: 'Medium' },
-      engagementRate: { estimate: 0.048, lowerBound: 0.035, upperBound: 0.061, confidence: 'Medium' },
-    },
-    dataSufficiency: contentItems.length > 0 ? 'Moderate' : 'ColdStart',
-    confidence: contentItems.length > 0 ? 'Medium' : 'Low',
-    factors: [
-      'Visual carousel format historically yields +22% higher engagement',
-      'Targeting mid-week audience peak posting window (Tuesday / Thursday 14:00 UTC)',
-      'Grounding score: 100% verified brand facts',
-    ],
-    sampleSize: 24,
-  };
-
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <PageHeader
@@ -217,7 +202,7 @@ export default function CampaignWorkspacePage({ params }: { params: { id: string
               </div>
             </div>
 
-            <EstimatedAnalyticsCard forecast={mockForecast} />
+            <EstimatedAnalyticsCard />
           </div>
         </div>
       )}

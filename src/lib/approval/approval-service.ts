@@ -132,7 +132,20 @@ export class ApprovalService {
    * Get Enriched Approval Queue & Tab Counts
    */
   public async getApprovalQueue(tenantId: string = 'tenant-default', statusFilter = 'PENDING') {
+    const whereClause: any = {};
+    if (tenantId && tenantId !== 'all') {
+      whereClause.campaign = {
+        brand: {
+          OR: [
+            { workspaceId: tenantId },
+            { workspaceId: null },
+          ],
+        },
+      };
+    }
+
     const allContentItems = await db.contentItem.findMany({
+      where: whereClause,
       include: {
         campaign: { include: { brand: true } },
         variants: true,

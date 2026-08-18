@@ -1,17 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { brandContextPackageBuilder } from '@/lib/ai/brand-context-package';
+import { db } from '@/lib/db';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const authResult = await resolveAuthorizedWorkspace(req);
     const brandId = params.id;
+
+    const brand = await db.brand.findUnique({
+      where: { id: brandId },
+      select: { id: true, workspaceId: true, userId: true },
+    });
+
+    if (!brand) {
+      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    }
+
+    const isAuthorized =
+      authResult.isAdmin ||
+      brand.workspaceId === authResult.workspaceId ||
+      brand.userId === authResult.userId;
+
+    if (!isAuthorized) {
+      throw new WorkspaceAuthError('Forbidden: Access denied to brand in another workspace', 403);
+    }
+
     const pkg = await brandContextPackageBuilder.buildPackage(brandId);
 
     if (!pkg) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
     }
+
 
     const offerings = pkg.products.length > 0
       ? pkg.products
@@ -57,7 +80,6 @@ export async function GET(
       suggestedCampaignNames,
     });
   } catch (error: any) {
-    console.error('Error generating brand suggestions:', error);
-    return NextResponse.json({ error: 'Failed to fetch brand suggestions' }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }

@@ -4,42 +4,33 @@ export async function getBrandsForWorkspace(
   workspaceId: string | null | undefined,
   userId?: string | null
 ): Promise<string[]> {
-  const targetWorkspace = workspaceId || 'tenant-default';
-
-  let brandFilter: any = {};
-
-  if (targetWorkspace === 'tenant-legal-002') {
-    brandFilter = {
-      OR: [
-        { name: { contains: 'Legal', mode: 'insensitive' } },
-        { name: { contains: 'Kandvate', mode: 'insensitive' } },
-      ],
-    };
-  } else if (targetWorkspace === 'tenant-demo-003') {
-    brandFilter = {
-      name: { contains: '[DEMO]', mode: 'insensitive' },
-    };
-  } else if (targetWorkspace === 'tenant-default') {
-    brandFilter = {
-      NOT: {
-        name: { contains: 'Legal', mode: 'insensitive' },
-      },
-    };
-  } else {
-    // Dynamic tenant / workspace resolution
-    brandFilter = {
-      OR: [
-        { workspaceId: targetWorkspace },
-        ...(userId ? [{ userId }] : []),
-      ],
-    };
+  if (!workspaceId) {
+    if (userId) {
+      const userBrands = await db.brand.findMany({
+        where: { userId, isArchived: false },
+        select: { id: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return userBrands.map((b) => b.id);
+    }
+    return [];
   }
 
+  const targetWorkspace = workspaceId.trim();
+
+  // Query database strictly by workspaceId (or userId fallback if workspaceId was null during legacy creation)
   const brands = await db.brand.findMany({
-    where: brandFilter,
+    where: {
+      OR: [
+        { workspaceId: targetWorkspace },
+        ...(userId ? [{ userId, workspaceId: null }] : []),
+      ],
+      isArchived: false,
+    },
     select: { id: true },
     orderBy: { createdAt: 'desc' },
   });
 
   return brands.map((b) => b.id);
 }
+

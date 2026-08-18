@@ -1,23 +1,55 @@
 import { db } from '@/lib/db';
-import { NextResponse } from 'next/server';
+import { resolveAuthorizedWorkspace, handleWorkspaceAuthError, WorkspaceAuthError } from '@/lib/workspace-auth';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const brandIdParam = searchParams.get('brandId');
+    const requestedWs = searchParams.get('workspaceId') || searchParams.get('tenantId');
     const filterMode = searchParams.get('mode') || 'all'; // 'real', 'simulated', 'all'
 
-    let brandId = brandIdParam;
-    if (!brandId) {
-      const firstBrand = await db.brand.findFirst();
-      brandId = firstBrand?.id || '';
+    const authResult = await resolveAuthorizedWorkspace(req, requestedWs);
+
+    let whereClause: any = {
+      publishingMode: filterMode === 'real' ? 'live' : filterMode === 'simulated' ? 'simulated' : undefined,
+    };
+
+    if (brandIdParam) {
+      const brand = await db.brand.findUnique({
+        where: { id: brandIdParam },
+        select: { id: true, workspaceId: true, userId: true },
+      });
+
+      if (!brand) {
+        return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+      }
+
+      const isAuthorized =
+        authResult.isAdmin ||
+        brand.workspaceId === authResult.workspaceId ||
+        brand.userId === authResult.userId;
+
+      if (!isAuthorized) {
+        throw new WorkspaceAuthError('Forbidden: Access denied to analytics for brand in another workspace', 403);
+      }
+
+      whereClause.contentItem = { campaign: { brandId: brandIdParam } };
+    } else {
+      whereClause.contentItem = {
+        campaign: {
+          brand: {
+            OR: [
+              { workspaceId: authResult.workspaceId },
+              { userId: authResult.userId, workspaceId: null },
+            ],
+          },
+        },
+      };
     }
 
     const publications = await db.publication.findMany({
-      where: {
-        contentItem: { campaign: { brandId } },
-        publishingMode: filterMode === 'real' ? 'live' : filterMode === 'simulated' ? 'simulated' : undefined,
-      },
+      where: whereClause,
       include: {
         contentItem: true,
         metricsSnapshots: {
@@ -94,6 +126,7 @@ export async function GET(req: Request) {
       publications,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleWorkspaceAuthError(error);
   }
 }
+
